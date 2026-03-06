@@ -84,7 +84,7 @@ function App() {
   return (
     <div className="app-container">
       <header>
-        <h1>MicroSaaS Rasyon</h1>
+        <h1>Ziraat Besi Rasyon</h1>
         <p>Büyükbaş Hayvan Besleme ve Rasyon Hazırlama Programı</p>
       </header>
       
