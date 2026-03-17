@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { initialFeeds } from './data/feeds';
-import { calculateRequirements, calculateRationTotals, estimateGCAA } from './utils/calculations';
+import { convertToDM } from './utils/calculations';
+import { getTheoryFunctions, THEORY_META } from './utils/theories';
 import InputSection from './components/InputSection';
 import FeedDatabase from './components/FeedDatabase';
 import RationBuilder from './components/RationBuilder';
@@ -16,10 +17,26 @@ function App() {
     const saved = localStorage.getItem('rasyon_targetGcaa');
     return saved ? Number(saved) : 1.5;
   });
+
+  const [selectedTheory, setSelectedTheory] = useState(() => {
+    const saved = localStorage.getItem('rasyon_theory');
+    return saved || 'nrc';
+  });
   
   const [feedsDb, setFeedsDb] = useState(() => {
     const saved = localStorage.getItem('rasyon_feedsDb');
-    return saved ? JSON.parse(saved) : initialFeeds;
+    if (saved) {
+      // Merge saved feeds with new fields from initialFeeds
+      const savedFeeds = JSON.parse(saved);
+      return savedFeeds.map(sf => {
+        const initial = initialFeeds.find(f => f.id === sf.id);
+        if (initial) {
+          return { ...initial, ...sf, ufl: sf.ufl ?? initial.ufl, ufb: sf.ufb ?? initial.ufb, pdie: sf.pdie ?? initial.pdie, pdin: sf.pdin ?? initial.pdin, kd: sf.kd ?? initial.kd, ndfd: sf.ndfd ?? initial.ndfd };
+        }
+        return { ufl: 0.8, ufb: 0.8, pdie: 80, pdin: 80, kd: 10, ndfd: 40, ...sf };
+      });
+    }
+    return initialFeeds;
   });
   
   const [rationItems, setRationItems] = useState(() => {
@@ -35,6 +52,10 @@ function App() {
   React.useEffect(() => {
     localStorage.setItem('rasyon_targetGcaa', targetGcaa);
   }, [targetGcaa]);
+
+  React.useEffect(() => {
+    localStorage.setItem('rasyon_theory', selectedTheory);
+  }, [selectedTheory]);
 
   React.useEffect(() => {
     localStorage.setItem('rasyon_feedsDb', JSON.stringify(feedsDb));
@@ -59,7 +80,6 @@ function App() {
   };
 
   const handleAddToRation = (feedId, amount) => {
-    // Check if feed already in ration
     const existing = rationItems.find(r => r.feedId === feedId);
     if (existing) {
       setRationItems(prev => prev.map(r => r.feedId === feedId ? { ...r, amount: r.amount + amount } : r));
@@ -76,10 +96,22 @@ function App() {
     setRationItems(prev => prev.filter(r => r.id !== id));
   };
 
+  // Get theory-specific functions
+  const theoryFns = useMemo(() => getTheoryFunctions(selectedTheory), [selectedTheory]);
+
   // Derived state
-  const requirements = useMemo(() => calculateRequirements(weight, targetGcaa), [weight, targetGcaa]);
-  const rationTotals = useMemo(() => calculateRationTotals(rationItems, feedsDb), [rationItems, feedsDb]);
-  const estimatedGcaa = useMemo(() => estimateGCAA(weight, rationTotals.me, rationTotals.cp), [weight, rationTotals.me, rationTotals.cp]);
+  const requirements = useMemo(
+    () => theoryFns.calculateRequirements(weight, targetGcaa),
+    [weight, targetGcaa, theoryFns]
+  );
+  const rationTotals = useMemo(
+    () => theoryFns.calculateRationTotals(rationItems, feedsDb),
+    [rationItems, feedsDb, theoryFns]
+  );
+  const estimatedGcaa = useMemo(
+    () => theoryFns.estimateGCAA(weight, rationTotals.energy, rationTotals.protein),
+    [weight, rationTotals.energy, rationTotals.protein, theoryFns]
+  );
 
   return (
     <div className="app-container">
@@ -94,13 +126,17 @@ function App() {
             weight={weight} 
             setWeight={setWeight} 
             targetGcaa={targetGcaa} 
-            setTargetGcaa={setTargetGcaa} 
+            setTargetGcaa={setTargetGcaa}
+            selectedTheory={selectedTheory}
+            setSelectedTheory={setSelectedTheory}
           />
           <ResultsDashboard 
             requirements={requirements} 
             totals={rationTotals} 
             targetGcaa={targetGcaa}
             estimatedGcaa={estimatedGcaa}
+            theoryMeta={theoryFns.meta}
+            selectedTheory={selectedTheory}
           />
         </div>
         
@@ -113,6 +149,8 @@ function App() {
             onRemove={handleRemoveFromRation}
             onClear={handleClearRation}
             totals={rationTotals}
+            theoryMeta={theoryFns.meta}
+            selectedTheory={selectedTheory}
           />
           <FeedDatabase 
             feedsDb={feedsDb} 

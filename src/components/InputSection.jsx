@@ -1,11 +1,36 @@
 import React from 'react';
+import { THEORY_META } from '../utils/theories';
 
-const InputSection = ({ weight, setWeight, targetGcaa, setTargetGcaa }) => {
+const InputSection = ({ weight, setWeight, targetGcaa, setTargetGcaa, selectedTheory, setSelectedTheory }) => {
+  const theories = Object.values(THEORY_META);
+  const currentTheory = THEORY_META[selectedTheory];
+
   return (
     <div className="glass-panel">
       <h2 className="panel-title">
         <span>🐄</span> Hayvan Bilgileri
       </h2>
+
+      {/* Theory Selector */}
+      <div className="form-group">
+        <label>Hesaplama Teorisi</label>
+        <div className="theory-selector">
+          {theories.map(t => (
+            <button
+              key={t.id}
+              className={`theory-btn ${selectedTheory === t.id ? 'active' : ''}`}
+              onClick={() => setSelectedTheory(t.id)}
+            >
+              <span className="theory-flag">{t.flag}</span>
+              <span className="theory-name">{t.name}</span>
+            </button>
+          ))}
+        </div>
+        <div className="theory-description">
+          <span className="theory-desc-icon">{currentTheory.flag}</span>
+          <span>{currentTheory.subtitle}</span>
+        </div>
+      </div>
       
       <div className="form-group">
         <label>Canlı Ağırlık (kg)</label>
