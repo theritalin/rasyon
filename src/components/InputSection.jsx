@@ -35,9 +35,13 @@ const InputSection = ({ weight, setWeight, targetGcaa, setTargetGcaa, selectedTh
       <div className="form-group">
         <label>Canlı Ağırlık (kg)</label>
         <input 
-          type="number" 
+          type="text" 
+          inputMode="decimal"
           value={weight} 
-          onChange={e => setWeight(Number(e.target.value))} 
+          onChange={e => {
+            const val = e.target.value.replace(',', '.');
+            if (val === '' || /^\d*\.?\d*$/.test(val)) setWeight(val);
+          }} 
           min="50" 
           max="1500" 
           step="50" 
@@ -47,9 +51,13 @@ const InputSection = ({ weight, setWeight, targetGcaa, setTargetGcaa, selectedTh
       <div className="form-group" style={{ marginBottom: 0 }}>
         <label>Hedef Günlük Canlı Ağırlık Artışı (GCAA) (kg)</label>
         <input 
-          type="number" 
+          type="text" 
+          inputMode="decimal"
           value={targetGcaa} 
-          onChange={e => setTargetGcaa(Number(e.target.value))} 
+          onChange={e => {
+            const val = e.target.value.replace(',', '.');
+            if (val === '' || /^\d*\.?\d*$/.test(val)) setTargetGcaa(val);
+          }} 
           min="0" 
           max="3" 
           step="0.1" 

@@ -75,8 +75,9 @@ export const nrcRequirements = (weight, targetGcaa) => {
 
   const minFiber = weight * 0.006;
   const cb = weight * 0.015 + ((targetGcaa || 0) * 1.5);
+  const targetDM = weight * 0.025;
 
-  return { energy: totalMe, protein: totalCp, minFiber, cb };
+  return { energy: totalMe, protein: totalCp, minFiber, cb, targetDM };
 };
 
 export const nrcRationTotals = (rationItems, feedsDb) => {
@@ -149,8 +150,9 @@ export const inraRequirements = (weight, targetGcaa) => {
 
   const minFiber = weight * 0.006;
   const cb = weight * 0.015 + ((targetGcaa || 0) * 1.5);
+  const targetDM = weight * 0.025;
 
-  return { energy: totalUfb, protein: totalPdi, minFiber, cb };
+  return { energy: totalUfb, protein: totalPdi, minFiber, cb, targetDM };
 };
 
 export const inraRationTotals = (rationItems, feedsDb) => {
@@ -238,8 +240,9 @@ export const cncpsRequirements = (weight, targetGcaa) => {
 
   const minFiber = weight * 0.006;
   const cb = weight * 0.015 + ((targetGcaa || 0) * 1.5);
+  const targetDM = weight * 0.025;
 
-  return { energy: totalMe, protein: totalMp, minFiber, cb };
+  return { energy: totalMe, protein: totalMp, minFiber, cb, targetDM };
 };
 
 export const cncpsRationTotals = (rationItems, feedsDb) => {

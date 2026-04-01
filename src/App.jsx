@@ -96,12 +96,16 @@ function App() {
     setRationItems(prev => prev.filter(r => r.id !== id));
   };
 
+  const handleUpdateFeedPrice = (feedId, price) => {
+    setFeedsDb(prev => prev.map(f => f.id === feedId ? { ...f, price } : f));
+  };
+
   // Get theory-specific functions
   const theoryFns = useMemo(() => getTheoryFunctions(selectedTheory), [selectedTheory]);
 
   // Derived state
   const requirements = useMemo(
-    () => theoryFns.calculateRequirements(weight, targetGcaa),
+    () => theoryFns.calculateRequirements(Number(weight) || 0, Number(targetGcaa) || 0),
     [weight, targetGcaa, theoryFns]
   );
   const rationTotals = useMemo(
@@ -109,7 +113,7 @@ function App() {
     [rationItems, feedsDb, theoryFns]
   );
   const estimatedGcaa = useMemo(
-    () => theoryFns.estimateGCAA(weight, rationTotals.energy, rationTotals.protein),
+    () => theoryFns.estimateGCAA(Number(weight) || 0, rationTotals.energy, rationTotals.protein),
     [weight, rationTotals.energy, rationTotals.protein, theoryFns]
   );
 
@@ -146,6 +150,7 @@ function App() {
             rationItems={rationItems}
             onAdd={handleAddToRation}
             onUpdateAmount={handleUpdateRationAmount}
+            onUpdateFeedPrice={handleUpdateFeedPrice}
             onRemove={handleRemoveFromRation}
             onClear={handleClearRation}
             totals={rationTotals}

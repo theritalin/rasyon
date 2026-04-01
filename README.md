@@ -28,6 +28,13 @@ KM (kg) = Yedirilen Miktar (kg) × (KM% / 100)
 ```
 **Örnek:** 10 kg Mısır Silajı (KM=%30) → `10 × 0.30 = 3.0 kg KM`
 
+### Hedef Kuru Madde (KM) Gereksinimi / Kapasitesi
+Hayvanın günlük tüketebileceği hedef Kuru Madde (KM) kapasitesi, teorilerden bağımsız olarak standart bir endüstri referansı olan **Canlı Ağırlığın %2.5'i** alınarak hesaplanır.
+```
+Hedef KM (kg) = Canlı Ağırlık (kg) × 0.025
+```
+**Örnek:** 500 kg hayvan → `500 × 0.025 = 12.5 kg KM / gün`
+
 ### Lif / Selüloz İhtiyacı
 İşkembe fonksiyonlarının sağlıklı çalışması ve laktik asidoz riskinin önlenmesi için minimum lif gereksinimi:
 ```

@@ -60,6 +60,12 @@ const ResultsDashboard = ({ requirements, totals, targetGcaa, estimatedGcaa, the
           decimals={selectedTheory === 'nrc' ? 2 : 0}
         />
         <MetricBlock 
+          label="Kuru Madde (KM)" 
+          provided={totals.dm} 
+          required={requirements.targetDM} 
+          unit="kg" 
+        />
+        <MetricBlock 
           label="Lif / Selüloz" 
           provided={totals.fiber} 
           required={requirements.minFiber} 

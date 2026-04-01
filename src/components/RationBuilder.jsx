@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { convertToDM } from '../utils/calculations';
 
-const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onRemove, onClear, totals, theoryMeta, selectedTheory }) => {
+const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onUpdateFeedPrice, onRemove, onClear, totals, theoryMeta, selectedTheory }) => {
   const [selectedFeedId, setSelectedFeedId] = useState('');
   const [amount, setAmount] = useState('');
 
@@ -56,6 +56,11 @@ const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onRemove, 
     return val.toFixed(0);
   };
 
+  const totalCost = rationItems.reduce((sum, item) => {
+    const feed = feedsDb.find(f => f.id === item.feedId);
+    return sum + (Number(item.amount) || 0) * (Number(feed?.price) || 0);
+  }, 0);
+
   return (
     <div className="glass-panel">
       <div className="flex-between mb-4">
@@ -87,9 +92,13 @@ const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onRemove, 
           <div style={{ flex: 1 }}>
             <label className="mb-2" style={{ display: 'block', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Miktar (kg)</label>
             <input 
-              type="number" 
+              type="text" 
+              inputMode="decimal"
               value={amount} 
-              onChange={e => setAmount(e.target.value)} 
+              onChange={e => {
+                const val = e.target.value.replace(',', '.');
+                if (val === '' || /^\d*\.?\d*$/.test(val)) setAmount(val);
+              }} 
               min="0.1" 
               step="0.1" 
               placeholder="0.0" 
@@ -108,13 +117,15 @@ const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onRemove, 
               <th>KM (kg)</th>
               <th>{theoryMeta.energyLabel.split('(')[0].trim()} ({theoryMeta.energyUnit})</th>
               <th>{theoryMeta.proteinLabel.split('(')[0].trim()} ({theoryMeta.proteinUnit})</th>
+              <th>Fiyat (₺/kg)</th>
+              <th>Maliyet (₺)</th>
               <th>İşlem</th>
             </tr>
           </thead>
           <tbody>
             {rationItems.length === 0 ? (
               <tr>
-                <td colSpan="6" style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
+                <td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
                   Henüz rasyona yem eklenmedi.
                 </td>
               </tr>
@@ -125,15 +136,22 @@ const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onRemove, 
                 const km = convertToDM(item.amount, feed.dm);
                 const energyVal = getEnergyValue(feed, km);
                 const proteinVal = getProteinValue(feed, km);
+                const cost = (Number(item.amount) || 0) * (Number(feed.price) || 0);
                 
                 return (
                   <tr key={item.id}>
                     <td>{feed.name}</td>
                     <td>
                       <input 
-                        type="number" 
+                        type="text" 
+                        inputMode="decimal"
                         value={item.amount} 
-                        onChange={e => onUpdateAmount(item.id, Number(e.target.value))} 
+                        onChange={e => {
+                          const val = e.target.value.replace(',', '.');
+                          if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                            onUpdateAmount(item.id, val);
+                          }
+                        }}
                         min="0" 
                         step="0.1"
                         style={{ width: '80px', padding: '0.4rem', background: 'rgba(255,255,255,0.05)' }} 
@@ -142,6 +160,22 @@ const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onRemove, 
                     <td>{km.toFixed(2)}</td>
                     <td>{energyVal.toFixed(2)}</td>
                     <td>{formatProtein(proteinVal)}</td>
+                    <td>
+                      <input 
+                        type="text" 
+                        inputMode="decimal"
+                        value={feed.price || ''} 
+                        onChange={e => {
+                          const val = e.target.value.replace(',', '.');
+                          if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                            onUpdateFeedPrice(feed.id, val);
+                          }
+                        }}
+                        placeholder="0.00"
+                        style={{ width: '70px', padding: '0.4rem', background: 'rgba(255,255,255,0.05)' }} 
+                      />
+                    </td>
+                    <td>{cost.toFixed(2)}</td>
                     <td>
                       <button className="btn-danger" onClick={() => onRemove(item.id)}>Kaldır</button>
                     </td>
@@ -156,6 +190,8 @@ const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onRemove, 
                 <td>{totals.dm.toFixed(2)} kg</td>
                 <td>{totals.energy.toFixed(2)}</td>
                 <td>{formatProtein(totals.protein)}</td>
+                <td>-</td>
+                <td>{totalCost.toFixed(2)} ₺</td>
                 <td>-</td>
               </tr>
             )}
