@@ -84,6 +84,7 @@ header p {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .glass-panel:hover {
@@ -107,6 +108,7 @@ header p {
   display: grid;
   grid-template-columns: 1fr;
   gap: 2rem;
+  min-width: 0;
 }
 
 @media (min-width: 1100px) {
@@ -121,12 +123,14 @@ header p {
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  min-width: 0;
 }
 
 .right-column {
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  min-width: 0;
 }
 
 .form-group {
@@ -514,4 +518,175 @@ tr:hover td {
 .theory-badge-sm {
   margin-left: 0.25rem;
   font-size: 0.9rem;
+}
+
+.footer {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.ration-input-group {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+/* ─── Mobile Responsiveness ─── */
+@media (max-width: 1024px) {
+  .app-container {
+    padding: 1.5rem 1rem;
+    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 768px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .app-container {
+    padding: 1rem 0.5rem;
+    gap: 1.5rem;
+  }
+
+  header h1 {
+    font-size: 2.25rem;
+  }
+
+  header p {
+    font-size: 1rem;
+  }
+
+  .glass-panel {
+    padding: 1rem;
+  }
+
+  .panel-title {
+    font-size: 1.15rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .flex-between {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .theory-selector {
+    flex-direction: row;
+    gap: 0.25rem;
+  }
+
+  .theory-btn {
+    padding: 0.5rem 0.25rem;
+  }
+
+  .theory-flag {
+    font-size: 1.1rem;
+  }
+
+  .theory-name {
+    font-size: 0.7rem;
+  }
+
+  .btn-primary, .btn-secondary, .btn-danger {
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    width: 100%;
+  }
+
+  .ration-input-group {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  /* Responsive Table Card View */
+  table, thead, tbody, th, td, tr {
+    display: block;
+  }
+
+  thead tr {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  tr {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 1rem;
+    border-radius: var(--radius-md);
+    background: rgba(15, 23, 42, 0.4);
+    overflow: hidden;
+  }
+
+  td {
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
+    padding: 0.75rem 0.75rem 0.75rem 50% !important;
+    text-align: right;
+    min-height: 2.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    font-size: 0.9rem;
+  }
+
+  td::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 0.75rem;
+    width: 45%;
+    white-space: normal;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+    text-transform: uppercase;
+  }
+
+  td:last-child {
+    border-bottom: none;
+  }
+
+  .table-container {
+    margin-top: 1rem;
+    background: transparent;
+    border: none;
+  }
+  
+  .metric-value {
+    font-size: 1.5rem;
+  }
+  
+  .footer {
+    text-align: center;
+    padding: 1rem;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  header h1 {
+    font-size: 1.75rem;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-value {
+    font-size: 1.25rem;
+  }
 }

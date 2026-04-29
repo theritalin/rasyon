@@ -88,7 +88,7 @@ const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onUpdateFe
             ))}
           </select>
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
+        <div className="ration-input-group">
           <div style={{ flex: 1 }}>
             <label className="mb-2" style={{ display: 'block', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Miktar (kg)</label>
             <input 
@@ -140,8 +140,8 @@ const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onUpdateFe
                 
                 return (
                   <tr key={item.id}>
-                    <td>{feed.name}</td>
-                    <td>
+                    <td data-label="Yem Adı">{feed.name}</td>
+                    <td data-label="Miktar (kg)">
                       <input 
                         type="text" 
                         inputMode="decimal"
@@ -157,10 +157,10 @@ const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onUpdateFe
                         style={{ width: '80px', padding: '0.4rem', background: 'rgba(255,255,255,0.05)' }} 
                       />
                     </td>
-                    <td>{km.toFixed(2)}</td>
-                    <td>{energyVal.toFixed(2)}</td>
-                    <td>{formatProtein(proteinVal)}</td>
-                    <td>
+                    <td data-label="KM (kg)">{km.toFixed(2)}</td>
+                    <td data-label={`${theoryMeta.energyLabel.split('(')[0].trim()} (${theoryMeta.energyUnit})`}>{energyVal.toFixed(2)}</td>
+                    <td data-label={`${theoryMeta.proteinLabel.split('(')[0].trim()} (${theoryMeta.proteinUnit})`}>{formatProtein(proteinVal)}</td>
+                    <td data-label="Fiyat (₺/kg)">
                       <input 
                         type="text" 
                         inputMode="decimal"
@@ -175,8 +175,8 @@ const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onUpdateFe
                         style={{ width: '70px', padding: '0.4rem', background: 'rgba(255,255,255,0.05)' }} 
                       />
                     </td>
-                    <td>{cost.toFixed(2)}</td>
-                    <td>
+                    <td data-label="Maliyet (₺)">{cost.toFixed(2)}</td>
+                    <td data-label="İşlem">
                       <button className="btn-danger" onClick={() => onRemove(item.id)}>Kaldır</button>
                     </td>
                   </tr>
@@ -185,14 +185,14 @@ const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onUpdateFe
             )}
             {rationItems.length > 0 && (
               <tr style={{ background: 'rgba(16, 185, 129, 0.1)', fontWeight: 'bold' }}>
-                <td>TOPLAM</td>
-                <td>{totals.asFed.toFixed(2)} kg</td>
-                <td>{totals.dm.toFixed(2)} kg</td>
-                <td>{totals.energy.toFixed(2)}</td>
-                <td>{formatProtein(totals.protein)}</td>
-                <td>-</td>
-                <td>{totalCost.toFixed(2)} ₺</td>
-                <td>-</td>
+                <td data-label="Yem Adı">TOPLAM</td>
+                <td data-label="Miktar (kg)">{totals.asFed.toFixed(2)} kg</td>
+                <td data-label="KM (kg)">{totals.dm.toFixed(2)} kg</td>
+                <td data-label={`${theoryMeta.energyLabel.split('(')[0].trim()} (${theoryMeta.energyUnit})`}>{totals.energy.toFixed(2)}</td>
+                <td data-label={`${theoryMeta.proteinLabel.split('(')[0].trim()} (${theoryMeta.proteinUnit})`}>{formatProtein(totals.protein)}</td>
+                <td data-label="Fiyat (₺/kg)">-</td>
+                <td data-label="Maliyet (₺)">{totalCost.toFixed(2)} ₺</td>
+                <td data-label="İşlem">-</td>
               </tr>
             )}
           </tbody>

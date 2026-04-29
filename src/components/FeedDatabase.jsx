@@ -54,18 +54,18 @@ const FeedDatabase = ({ feedsDb, onUpdateFeed, onAddFeed }) => {
               <tr key={feed.id}>
                 {editingId === feed.id ? (
                   <>
-                    <td><input type="text" value={editForm.name} onChange={e => handleChange(e, 'name')} /></td>
-                    <td>
+                    <td data-label="Yem Adı"><input type="text" value={editForm.name} onChange={e => handleChange(e, 'name')} /></td>
+                    <td data-label="Tür">
                       <select value={editForm.type} onChange={e => handleChange(e, 'type')}>
                         <option value="kesif">Kesif (Fabrika/Dane)</option>
                         <option value="kaba">Kaba (Ot/Saman/Silaj)</option>
                       </select>
                     </td>
-                    <td><input type="number" step="0.1" value={editForm.dm} onChange={e => handleChange(e, 'dm')} /></td>
-                    <td><input type="number" step="0.1" value={editForm.cp} onChange={e => handleChange(e, 'cp')} /></td>
-                    <td><input type="number" step="0.1" value={editForm.me} onChange={e => handleChange(e, 'me')} /></td>
-                    <td><input type="number" step="0.1" value={editForm.fb} onChange={e => handleChange(e, 'fb')} /></td>
-                    <td>
+                    <td data-label="KM %"><input type="number" step="0.1" value={editForm.dm} onChange={e => handleChange(e, 'dm')} /></td>
+                    <td data-label="Protein %"><input type="number" step="0.1" value={editForm.cp} onChange={e => handleChange(e, 'cp')} /></td>
+                    <td data-label="ME (Mcal)"><input type="number" step="0.1" value={editForm.me} onChange={e => handleChange(e, 'me')} /></td>
+                    <td data-label="Lif %"><input type="number" step="0.1" value={editForm.fb} onChange={e => handleChange(e, 'fb')} /></td>
+                    <td data-label="İşlem">
                       <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button className="btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={saveEdit}>Kaydet</button>
                         <button className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={cancelEdit}>İptal</button>
@@ -74,13 +74,13 @@ const FeedDatabase = ({ feedsDb, onUpdateFeed, onAddFeed }) => {
                   </>
                 ) : (
                   <>
-                    <td>{feed.name}</td>
-                    <td>{feed.type === 'kaba' ? 'Kaba Yem' : 'Kesif Yem'}</td>
-                    <td>{feed.dm}</td>
-                    <td>{feed.cp}</td>
-                    <td>{feed.me}</td>
-                    <td>{feed.fb}</td>
-                    <td>
+                    <td data-label="Yem Adı">{feed.name}</td>
+                    <td data-label="Tür">{feed.type === 'kaba' ? 'Kaba Yem' : 'Kesif Yem'}</td>
+                    <td data-label="KM %">{feed.dm}</td>
+                    <td data-label="Protein %">{feed.cp}</td>
+                    <td data-label="ME (Mcal)">{feed.me}</td>
+                    <td data-label="Lif %">{feed.fb}</td>
+                    <td data-label="İşlem">
                       <button className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => startEdit(feed)}>Düzenle</button>
                     </td>
                   </>
