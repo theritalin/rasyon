@@ -62,20 +62,53 @@ const calcSharedMetrics = (totalDM, totalKesifDM, totalCB, totalEnergyFromProtei
 // ═══════════════════════════════════════════════
 //  N R C   (mevcut / referans sistem)
 // ═══════════════════════════════════════════════
-export const nrcRequirements = (weight, targetGcaa) => {
-  if (!weight || weight <= 0) return { energy: 0, protein: 0, minFiber: 0, cb: 0 };
+export const nrcRequirements = ({ weight, targetGcaa, animalType, milkYield, milkFat, pregnancyPeriod }) => {
+  if (!weight || weight <= 0) return { energy: 0, protein: 0, minFiber: 0, cb: 0, targetDM: 0 };
 
-  const mEm = weight * 0.035;                       // Mcal yaşama payı
-  const mEg = (targetGcaa || 0) * (weight * 0.015);  // Mcal büyüme payı
-  const totalMe = mEm + mEg;
+  const isBesi = animalType === 'besi' || animalType === 'bos_duve';
+  const isLactating = animalType === 'sagmal' || animalType === 'gebe_sagmal';
+  const isPregnant = animalType === 'gebe_sagmal' || animalType === 'kuru_gebe';
 
-  const cPm = weight * 0.001;                        // kg yaşama payı
-  const cPg = (targetGcaa || 0) * 0.35;              // kg büyüme payı
-  const totalCp = cPm + cPg;
+  let totalMe = weight * 0.035; // Mcal yaşama payı (mEm)
+  let totalCp = weight * 0.001; // kg yaşama payı (cPm)
+
+  if (isBesi) {
+    totalMe += (targetGcaa || 0) * (weight * 0.015);
+    totalCp += (targetGcaa || 0) * 0.35;
+  }
+
+  if (isLactating) {
+    // Süt için enerji (ME) = Süt verimi * Süt enerjisi
+    // %3.5 yağlı süt için yaklaşık 0.7 Mcal ME/kg
+    const milkMe = milkYield * (0.4 + (milkFat * 0.085)); // Basit NRC tahmini
+    totalMe += milkMe;
+    
+    // Süt için protein (HP) = ~85g / kg süt (0.085 kg)
+    const milkCp = milkYield * 0.085;
+    totalCp += milkCp;
+  }
+
+  if (isPregnant) {
+    if (pregnancyPeriod === 'son_3_ay') {
+      // Gebeliğin son 3 ayı için ek gereksinimler
+      totalMe += 3.0; // Mcal/gün
+      totalCp += 0.250; // kg/gün (250g)
+    } else {
+      // İlk 6 ay için çok düşük, hafif eklenebilir veya 0
+      totalMe += 0.5;
+      totalCp += 0.050;
+    }
+  }
 
   const minFiber = weight * 0.006;
-  const cb = weight * 0.015 + ((targetGcaa || 0) * 1.5);
-  const targetDM = weight * 0.025;
+  const cb = weight * 0.015 + (isBesi ? ((targetGcaa || 0) * 1.5) : (milkYield * 0.05));
+  
+  // Hedef Kuru Madde (KM) Tüketimi
+  let targetDM = weight * 0.025; // Besi için %2.5
+  if (isLactating) {
+    // Sağmal inekler canlı ağırlıklarının %3 - %4'ü kadar KM tüketebilir
+    targetDM = (weight * 0.02) + (milkYield * 0.3); // NRC'ye yakın bir tahmin
+  }
 
   return { energy: totalMe, protein: totalCp, minFiber, cb, targetDM };
 };
@@ -111,17 +144,42 @@ export const nrcRationTotals = (rationItems, feedsDb) => {
   };
 };
 
-export const nrcEstimateGCAA = (weight, totalEnergy, totalProtein) => {
-  if (!weight || weight <= 0) return 0;
-  const mEm = weight * 0.035;
-  const availableE = totalEnergy - mEm;
-  const cPm = weight * 0.001;
-  const availableP = totalProtein - cPm;
+export const nrcEstimateProduction = ({ weight, energy, protein, animalType, milkFat, pregnancyPeriod }) => {
+  if (!weight || weight <= 0) return { gcaa: 0, milk: 0 };
+  
+  const isBesi = animalType === 'besi' || animalType === 'bos_duve';
+  const isLactating = animalType === 'sagmal' || animalType === 'gebe_sagmal';
+  const isPregnant = animalType === 'gebe_sagmal' || animalType === 'kuru_gebe';
 
-  const gcaaE = availableE > 0 ? availableE / (weight * 0.015) : availableE / (weight * 0.010);
-  const gcaaP = availableP > 0 ? availableP / 0.35 : availableP / 0.25;
+  let mEm = weight * 0.035;
+  let cPm = weight * 0.001;
 
-  return Math.max(-2, Math.min(3, Math.min(gcaaE, gcaaP)));
+  if (isPregnant) {
+    if (pregnancyPeriod === 'son_3_ay') {
+      mEm += 3.0;
+      cPm += 0.250;
+    } else {
+      mEm += 0.5;
+      cPm += 0.050;
+    }
+  }
+
+  const availableE = energy - mEm;
+  const availableP = protein - cPm;
+
+  if (isBesi || animalType === 'kuru_gebe') {
+    const gcaaE = availableE > 0 ? availableE / (weight * 0.015) : availableE / (weight * 0.010);
+    const gcaaP = availableP > 0 ? availableP / 0.35 : availableP / 0.25;
+    return { gcaa: Math.max(-2, Math.min(3, Math.min(gcaaE, gcaaP))), milk: 0 };
+  } else {
+    // Lactating
+    const energyPerKgMilk = 0.4 + ((milkFat || 3.5) * 0.085);
+    const proteinPerKgMilk = 0.085;
+    
+    const milkE = availableE > 0 ? availableE / energyPerKgMilk : 0;
+    const milkP = availableP > 0 ? availableP / proteinPerKgMilk : 0;
+    return { gcaa: 0, milk: Math.max(0, Math.min(milkE, milkP)) };
+  }
 };
 
 // ═══════════════════════════════════════════════
@@ -130,27 +188,50 @@ export const nrcEstimateGCAA = (weight, totalEnergy, totalProtein) => {
 //  Temel fark: Enerji "UFB" birimi, protein "PDI" sistemi.
 //  PDI = min(toplam PDIE, toplam PDIN) — rasyon düzeyinde!
 // ═══════════════════════════════════════════════
-export const inraRequirements = (weight, targetGcaa) => {
-  if (!weight || weight <= 0) return { energy: 0, protein: 0, minFiber: 0, cb: 0 };
+export const inraRequirements = ({ weight, targetGcaa, animalType, milkYield, milkFat, pregnancyPeriod }) => {
+  if (!weight || weight <= 0) return { energy: 0, protein: 0, minFiber: 0, cb: 0, targetDM: 0 };
 
-  // UFB gereksinimi (besi sığırı)
-  // Yaşama payı ≈ 1.4 + 0.006 × CA  (INRA 2018 basitleştirilmiş)
-  const ufbMaintenance = 1.4 + 0.006 * weight;
-  // Büyüme payı: ~3.2 UFB / kg GCAA (besi sığırı ortalaması)
-  const ufbGrowth = (targetGcaa || 0) * 3.2;
-  const totalUfb = ufbMaintenance + ufbGrowth;
+  const isBesi = animalType === 'besi' || animalType === 'bos_duve';
+  const isLactating = animalType === 'sagmal' || animalType === 'gebe_sagmal';
+  const isPregnant = animalType === 'gebe_sagmal' || animalType === 'kuru_gebe';
+
+  // UFB gereksinimi
+  let totalUfb = 1.4 + 0.006 * weight; // Yaşama payı
 
   // PDI gereksinimi (g/gün)
-  // Yaşama: 3.25 × CA^0.75
   const metabolicWeight = Math.pow(weight, 0.75);
-  const pdiMaintenance = 3.25 * metabolicWeight;
-  // Büyüme: ~280 g PDI / kg GCAA
-  const pdiGrowth = (targetGcaa || 0) * 280;
-  const totalPdi = pdiMaintenance + pdiGrowth;
+  let totalPdi = 3.25 * metabolicWeight; // Yaşama payı
+
+  if (isBesi) {
+    totalUfb += (targetGcaa || 0) * 3.2; // Büyüme payı (UFB)
+    totalPdi += (targetGcaa || 0) * 280; // Büyüme payı (PDI)
+  }
+
+  if (isLactating) {
+    // 1 kg %4 yağlı süt = ~0.44 UFL (INRA'da süt için UFL kullanılır ama basitlik için UFB ile entegre edelim)
+    const milkEnergy = milkYield * (0.35 + (milkFat * 0.02)); // UFB/UFL yaklaşımı
+    totalUfb += milkEnergy;
+    
+    // Süt PDI gereksinimi: ~50g PDI / kg süt
+    totalPdi += milkYield * 50;
+  }
+
+  if (isPregnant) {
+    if (pregnancyPeriod === 'son_3_ay') {
+      totalUfb += 2.0; // UFB
+      totalPdi += 200; // g PDI
+    } else {
+      totalUfb += 0.3;
+      totalPdi += 30;
+    }
+  }
 
   const minFiber = weight * 0.006;
-  const cb = weight * 0.015 + ((targetGcaa || 0) * 1.5);
-  const targetDM = weight * 0.025;
+  const cb = weight * 0.015 + (isBesi ? ((targetGcaa || 0) * 1.5) : (milkYield * 0.05));
+  let targetDM = weight * 0.025;
+  if (isLactating) {
+    targetDM = (weight * 0.02) + (milkYield * 0.3);
+  }
 
   return { energy: totalUfb, protein: totalPdi, minFiber, cb, targetDM };
 };
@@ -200,19 +281,42 @@ export const inraRationTotals = (rationItems, feedsDb) => {
   };
 };
 
-export const inraEstimateGCAA = (weight, totalEnergy, totalProtein) => {
-  if (!weight || weight <= 0) return 0;
+export const inraEstimateProduction = ({ weight, energy, protein, animalType, milkFat, pregnancyPeriod }) => {
+  if (!weight || weight <= 0) return { gcaa: 0, milk: 0 };
+  
+  const isBesi = animalType === 'besi' || animalType === 'bos_duve';
+  const isPregnant = animalType === 'gebe_sagmal' || animalType === 'kuru_gebe';
 
-  const ufbMaintenance = 1.4 + 0.006 * weight;
-  const availableUfb = totalEnergy - ufbMaintenance;
-  const gcaaFromEnergy = availableUfb > 0 ? availableUfb / 3.2 : availableUfb / 2.5;
-
+  let ufbMaintenance = 1.4 + 0.006 * weight;
   const metabolicWeight = Math.pow(weight, 0.75);
-  const pdiMaintenance = 3.25 * metabolicWeight;
-  const availablePdi = totalProtein - pdiMaintenance;
-  const gcaaFromProtein = availablePdi > 0 ? availablePdi / 280 : availablePdi / 200;
+  let pdiMaintenance = 3.25 * metabolicWeight;
 
-  return Math.max(-2, Math.min(3, Math.min(gcaaFromEnergy, gcaaFromProtein)));
+  if (isPregnant) {
+    if (pregnancyPeriod === 'son_3_ay') {
+      ufbMaintenance += 2.0;
+      pdiMaintenance += 200;
+    } else {
+      ufbMaintenance += 0.3;
+      pdiMaintenance += 30;
+    }
+  }
+
+  const availableUfb = energy - ufbMaintenance;
+  const availablePdi = protein - pdiMaintenance;
+
+  if (isBesi || animalType === 'kuru_gebe') {
+    const gcaaE = availableUfb > 0 ? availableUfb / 3.2 : availableUfb / 2.5;
+    const gcaaP = availablePdi > 0 ? availablePdi / 280 : availablePdi / 200;
+    return { gcaa: Math.max(-2, Math.min(3, Math.min(gcaaE, gcaaP))), milk: 0 };
+  } else {
+    // Lactating
+    const energyPerKgMilk = 0.35 + ((milkFat || 3.5) * 0.02);
+    const proteinPerKgMilk = 50;
+    
+    const milkE = availableUfb > 0 ? availableUfb / energyPerKgMilk : 0;
+    const milkP = availablePdi > 0 ? availablePdi / proteinPerKgMilk : 0;
+    return { gcaa: 0, milk: Math.max(0, Math.min(milkE, milkP)) };
+  }
 };
 
 // ═══════════════════════════════════════════════
@@ -222,25 +326,48 @@ export const inraEstimateGCAA = (weight, totalEnergy, totalProtein) => {
 //  Protein: kd bazlı RDP/RUP ayrımı → Mikrobik CP + Bypass → MP
 //  Ekstra: Senkronizasyon skoru
 // ═══════════════════════════════════════════════
-export const cncpsRequirements = (weight, targetGcaa) => {
-  if (!weight || weight <= 0) return { energy: 0, protein: 0, minFiber: 0, cb: 0 };
+export const cncpsRequirements = ({ weight, targetGcaa, animalType, milkYield, milkFat, pregnancyPeriod }) => {
+  if (!weight || weight <= 0) return { energy: 0, protein: 0, minFiber: 0, cb: 0, targetDM: 0 };
 
-  // Enerji: ME bazlı (NRC ile aynı birim — Mcal)
-  const mEm = weight * 0.035;
-  const mEg = (targetGcaa || 0) * (weight * 0.015);
-  const totalMe = mEm + mEg;
+  const isBesi = animalType === 'besi' || animalType === 'bos_duve';
+  const isLactating = animalType === 'sagmal' || animalType === 'gebe_sagmal';
+  const isPregnant = animalType === 'gebe_sagmal' || animalType === 'kuru_gebe';
 
-  // Metabolik Protein (MP) gereksinimi (g/gün)
+  let totalMe = weight * 0.035;
   const metabolicWeight = Math.pow(weight, 0.75);
-  // Yaşama payı: ~3.8 g MP / kg metabolik ağırlık
-  const mpMaintenance = 3.8 * metabolicWeight;
-  // Büyüme payı: ~305 g MP / kg GCAA
-  const mpGrowth = (targetGcaa || 0) * 305;
-  const totalMp = mpMaintenance + mpGrowth;
+  let totalMp = 3.8 * metabolicWeight; // g MP
+
+  if (isBesi) {
+    totalMe += (targetGcaa || 0) * (weight * 0.015);
+    totalMp += (targetGcaa || 0) * 305;
+  }
+
+  if (isLactating) {
+    // Süt için CNCPS: %3.5 yağ, ~0.7 Mcal ME
+    const milkMe = milkYield * (0.4 + (milkFat * 0.085));
+    totalMe += milkMe;
+    
+    // MP for milk: ~45g MP / kg milk (süt proteini için net)
+    totalMp += milkYield * 45;
+  }
+
+  if (isPregnant) {
+    if (pregnancyPeriod === 'son_3_ay') {
+      totalMe += 3.0; // Mcal/gün
+      totalMp += 150; // g MP/gün
+    } else {
+      totalMe += 0.5;
+      totalMp += 20;
+    }
+  }
 
   const minFiber = weight * 0.006;
-  const cb = weight * 0.015 + ((targetGcaa || 0) * 1.5);
-  const targetDM = weight * 0.025;
+  const cb = weight * 0.015 + (isBesi ? ((targetGcaa || 0) * 1.5) : (milkYield * 0.05));
+  
+  let targetDM = weight * 0.025;
+  if (isLactating) {
+    targetDM = (weight * 0.02) + (milkYield * 0.3);
+  }
 
   return { energy: totalMe, protein: totalMp, minFiber, cb, targetDM };
 };
@@ -344,23 +471,42 @@ export const cncpsRationTotals = (rationItems, feedsDb) => {
   };
 };
 
-export const cncpsEstimateGCAA = (weight, totalEnergy, totalProtein) => {
-  if (!weight || weight <= 0) return 0;
+export const cncpsEstimateProduction = ({ weight, energy, protein, animalType, milkFat, pregnancyPeriod }) => {
+  if (!weight || weight <= 0) return { gcaa: 0, milk: 0 };
+  
+  const isBesi = animalType === 'besi' || animalType === 'bos_duve';
+  const isPregnant = animalType === 'gebe_sagmal' || animalType === 'kuru_gebe';
 
-  // Enerji bazlı (ME — NRC ile aynı birim)
-  const mEm = weight * 0.035;
-  const availableE = totalEnergy - mEm;
-  const gcaaFromEnergy = availableE > 0
-    ? availableE / (weight * 0.015)
-    : availableE / (weight * 0.010);
-
-  // Protein bazlı (MP)
+  let mEm = weight * 0.035;
   const metabolicWeight = Math.pow(weight, 0.75);
-  const mpMaintenance = 3.8 * metabolicWeight;
-  const availableP = totalProtein - mpMaintenance;
-  const gcaaFromProtein = availableP > 0 ? availableP / 305 : availableP / 220;
+  let mpMaintenance = 3.8 * metabolicWeight;
 
-  return Math.max(-2, Math.min(3, Math.min(gcaaFromEnergy, gcaaFromProtein)));
+  if (isPregnant) {
+    if (pregnancyPeriod === 'son_3_ay') {
+      mEm += 3.0;
+      mpMaintenance += 150;
+    } else {
+      mEm += 0.5;
+      mpMaintenance += 20;
+    }
+  }
+
+  const availableE = energy - mEm;
+  const availableP = protein - mpMaintenance;
+
+  if (isBesi || animalType === 'kuru_gebe') {
+    const gcaaE = availableE > 0 ? availableE / (weight * 0.015) : availableE / (weight * 0.010);
+    const gcaaP = availableP > 0 ? availableP / 305 : availableP / 220;
+    return { gcaa: Math.max(-2, Math.min(3, Math.min(gcaaE, gcaaP))), milk: 0 };
+  } else {
+    // Lactating
+    const energyPerKgMilk = 0.4 + ((milkFat || 3.5) * 0.085);
+    const proteinPerKgMilk = 45; // MP
+    
+    const milkE = availableE > 0 ? availableE / energyPerKgMilk : 0;
+    const milkP = availableP > 0 ? availableP / proteinPerKgMilk : 0;
+    return { gcaa: 0, milk: Math.max(0, Math.min(milkE, milkP)) };
+  }
 };
 
 // ─────────────────────────────────────────────
@@ -372,14 +518,14 @@ export const getTheoryFunctions = (theory) => {
       return {
         calculateRequirements: inraRequirements,
         calculateRationTotals: inraRationTotals,
-        estimateGCAA: inraEstimateGCAA,
+        estimateProduction: inraEstimateProduction,
         meta: THEORY_META.inra,
       };
     case 'cncps':
       return {
         calculateRequirements: cncpsRequirements,
         calculateRationTotals: cncpsRationTotals,
-        estimateGCAA: cncpsEstimateGCAA,
+        estimateProduction: cncpsEstimateProduction,
         meta: THEORY_META.cncps,
       };
     case 'nrc':
@@ -387,7 +533,7 @@ export const getTheoryFunctions = (theory) => {
       return {
         calculateRequirements: nrcRequirements,
         calculateRationTotals: nrcRationTotals,
-        estimateGCAA: nrcEstimateGCAA,
+        estimateProduction: nrcEstimateProduction,
         meta: THEORY_META.nrc,
       };
   }

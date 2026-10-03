@@ -18,6 +18,24 @@ function App() {
     return saved ? Number(saved) : 1.5;
   });
 
+  const [animalType, setAnimalType] = useState(() => {
+    return localStorage.getItem('rasyon_animalType') || 'besi';
+  });
+
+  const [milkYield, setMilkYield] = useState(() => {
+    const saved = localStorage.getItem('rasyon_milkYield');
+    return saved ? Number(saved) : 20;
+  });
+
+  const [milkFat, setMilkFat] = useState(() => {
+    const saved = localStorage.getItem('rasyon_milkFat');
+    return saved ? Number(saved) : 3.5;
+  });
+
+  const [pregnancyPeriod, setPregnancyPeriod] = useState(() => {
+    return localStorage.getItem('rasyon_pregnancyPeriod') || 'ilk_6_ay';
+  });
+
   const [selectedTheory, setSelectedTheory] = useState(() => {
     const saved = localStorage.getItem('rasyon_theory');
     return saved || 'nrc';
@@ -28,13 +46,22 @@ function App() {
     if (saved) {
       // Merge saved feeds with new fields from initialFeeds
       const savedFeeds = JSON.parse(saved);
-      return savedFeeds.map(sf => {
+      const mergedFeeds = savedFeeds.map(sf => {
         const initial = initialFeeds.find(f => f.id === sf.id);
         if (initial) {
           return { ...initial, ...sf, ufl: sf.ufl ?? initial.ufl, ufb: sf.ufb ?? initial.ufb, pdie: sf.pdie ?? initial.pdie, pdin: sf.pdin ?? initial.pdin, kd: sf.kd ?? initial.kd, ndfd: sf.ndfd ?? initial.ndfd };
         }
         return { ufl: 0.8, ufb: 0.8, pdie: 80, pdin: 80, kd: 10, ndfd: 40, ...sf };
       });
+      
+      // Add any new feeds from initialFeeds that aren't in savedFeeds
+      initialFeeds.forEach(initial => {
+        if (!mergedFeeds.find(f => f.id === initial.id)) {
+          mergedFeeds.push(initial);
+        }
+      });
+      
+      return mergedFeeds;
     }
     return initialFeeds;
   });
@@ -52,6 +79,22 @@ function App() {
   React.useEffect(() => {
     localStorage.setItem('rasyon_targetGcaa', targetGcaa);
   }, [targetGcaa]);
+
+  React.useEffect(() => {
+    localStorage.setItem('rasyon_animalType', animalType);
+  }, [animalType]);
+
+  React.useEffect(() => {
+    localStorage.setItem('rasyon_milkYield', milkYield);
+  }, [milkYield]);
+
+  React.useEffect(() => {
+    localStorage.setItem('rasyon_milkFat', milkFat);
+  }, [milkFat]);
+
+  React.useEffect(() => {
+    localStorage.setItem('rasyon_pregnancyPeriod', pregnancyPeriod);
+  }, [pregnancyPeriod]);
 
   React.useEffect(() => {
     localStorage.setItem('rasyon_theory', selectedTheory);
@@ -105,16 +148,32 @@ function App() {
 
   // Derived state
   const requirements = useMemo(
-    () => theoryFns.calculateRequirements(Number(weight) || 0, Number(targetGcaa) || 0),
-    [weight, targetGcaa, theoryFns]
+    () => theoryFns.calculateRequirements({
+      weight: Number(weight) || 0, 
+      targetGcaa: Number(targetGcaa) || 0,
+      animalType,
+      milkYield: Number(milkYield) || 0,
+      milkFat: Number(milkFat) || 3.5,
+      pregnancyPeriod
+    }),
+    [weight, targetGcaa, animalType, milkYield, milkFat, pregnancyPeriod, theoryFns]
   );
+  
   const rationTotals = useMemo(
     () => theoryFns.calculateRationTotals(rationItems, feedsDb),
     [rationItems, feedsDb, theoryFns]
   );
-  const estimatedGcaa = useMemo(
-    () => theoryFns.estimateGCAA(Number(weight) || 0, rationTotals.energy, rationTotals.protein),
-    [weight, rationTotals.energy, rationTotals.protein, theoryFns]
+  
+  const estimatedProduction = useMemo(
+    () => theoryFns.estimateProduction({
+      weight: Number(weight) || 0, 
+      energy: rationTotals.energy, 
+      protein: rationTotals.protein,
+      animalType,
+      milkFat: Number(milkFat) || 3.5,
+      pregnancyPeriod
+    }),
+    [weight, rationTotals.energy, rationTotals.protein, animalType, milkFat, pregnancyPeriod, theoryFns]
   );
 
   return (
@@ -131,6 +190,14 @@ function App() {
             setWeight={setWeight} 
             targetGcaa={targetGcaa} 
             setTargetGcaa={setTargetGcaa}
+            animalType={animalType}
+            setAnimalType={setAnimalType}
+            milkYield={milkYield}
+            setMilkYield={setMilkYield}
+            milkFat={milkFat}
+            setMilkFat={setMilkFat}
+            pregnancyPeriod={pregnancyPeriod}
+            setPregnancyPeriod={setPregnancyPeriod}
             selectedTheory={selectedTheory}
             setSelectedTheory={setSelectedTheory}
           />
@@ -138,7 +205,8 @@ function App() {
             requirements={requirements} 
             totals={rationTotals} 
             targetGcaa={targetGcaa}
-            estimatedGcaa={estimatedGcaa}
+            estimatedProduction={estimatedProduction}
+            animalType={animalType}
             theoryMeta={theoryFns.meta}
             selectedTheory={selectedTheory}
           />

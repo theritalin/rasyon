@@ -52,4 +52,7 @@ export const initialFeeds = [
 
   { id: 16, name: 'Buzağı Büyütme Yemi', type: 'kesif', dm: 88, cp: 18, me: 2.8, fb: 7, cb: 55,
     ufl: 1.04, ufb: 1.04, pdie: 115, pdin: 122, kd: 10, ndfd: 52 },
+
+  { id: 17, name: 'Süt Yemi (%19 HP)', type: 'kesif', dm: 88, cp: 19, me: 2.7, fb: 8, cb: 45,
+    ufl: 1.02, ufb: 1.02, pdie: 118, pdin: 130, kd: 9, ndfd: 50 },
 ];

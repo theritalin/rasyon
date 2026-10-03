@@ -510,3 +510,28 @@ Tahmini GCAA = min(GCAA_enerji, GCAA_protein)
 | Protein (yaşama) | 0.5 kg | 344 g | 402 g |
 | Protein (büyüme) | 0.525 kg | 420 g | 458 g |
 | **Protein (toplam)** | **1.025 kg** | **764 g** | **860 g** |
+
+---
+
+# Dişi Hayvan (Süt ve Gebelik) Hesaplamaları
+
+Yeni eklenen sistem sayesinde program artık sadece erkek besi hayvanlarını değil, **Boş Düve**, **Sağmal İnek** ve **Gebe İnek** rasyonlarını da hesaplamaktadır. Dişi hayvanların hesaplama prensipleri temel olarak yaşama ve büyüme paylarına eklenen **süt verimi** ve **gebelik** paylarından oluşur.
+
+## 1. Sağmal İnek (Süt Verimi) Hesaplamaları
+Süt veren bir ineğin rasyonunda, ürettiği her 1 litre süt ve bu sütün yağ oranına göre ekstra enerji ve protein hesaplanır.
+
+*   **Enerji İhtiyacı (NRC):** Yaklaşık olarak 1 kg %3.5 yağlı süt için **~0.7 Mcal ME** gerekir. Formülasyonda süt yağ oranına göre daha hassas bir çarpan kullanılır `(0.4 + (Süt Yağı × 0.085))`.
+*   **Protein İhtiyacı (NRC):** 1 kg süt üretimi için yaklaşık **85 gram Ham Protein (HP)** eklenir.
+*   **INRA ve CNCPS:** Bu teorilerde de sütün kalitesine göre (INRA'da ~0.44 UFB, CNCPS'de ~45g MP) ekstra süt gereksinimleri otomatik eklenir.
+*   **Kuru Madde Tüketimi:** Sağmal inekler, besi hayvanlarına göre daha fazla kuru madde tüketebilir. Formülasyon `CA × %2` + `Süt Verimi × 0.3` şeklinde esnetilmiştir.
+
+## 2. Gebe İnek (Gebelik Dönemi) Hesaplamaları
+Gebeliğin ilk aylarında ceninin (fötus) büyümesi yavaştır, bu yüzden rasyona büyük bir yük getirmez. Ancak **son 3 ayda** fötus çok hızlı büyür ve ek gereksinimler doğar.
+
+*   **İlk 6 Ay:** Gereksinim artışı minimum düzeydedir (Örn: +0.5 Mcal ME, +50g HP).
+*   **Son 3 Ay (Kuru Dönem):** Fötusun gelişimi için yüksek bir gereksinim artışı yaşanır. Günlük yaşama payına yaklaşık **+3.0 Mcal ME** ve **+250g HP** (NRC) eklenir. İneğin bu dönemde aşırı yağlanmaması ve kalsiyum dengesine dikkat edilmesi (süt hummasını önlemek için) çok önemlidir.
+
+## Tahmini Verim (Süt vs. GCAA)
+Sistem seçilen hayvan türüne göre tahminleme yapar:
+*   **Erkek Besi / Boş Düve / Kuru Gebe:** Rasyondaki mevcut enerji ve proteinden yaşama ve gebelik payları düşülür, kalan miktar ile **"Tahmini Günlük Canlı Ağırlık Artışı (GCAA)"** hesaplanır.
+*   **Sağmal / Gebe Sağmal:** Rasyondaki mevcut enerji ve proteinden yaşama ve gebelik payları düşülür, kalan miktar ile **"Tahmini Süt Verimi (Litre)"** hesaplanarak gösterilir.
