@@ -1,4 +1,4 @@
-import { THEORY_META } from '../utils/theories';
+import { THEORY_META, meMaintenance } from '../utils/theories';
 import { toNum } from '../utils/calculations';
 import NumberField from './NumberField';
 
@@ -48,7 +48,7 @@ const InputSection = ({
 
   const maintenance = selectedTheory === 'inra'
     ? `${(1.4 + 0.006 * w).toFixed(2)} UFB`
-    : `${(w * 0.035).toFixed(2)} Mcal ME`;
+    : `${meMaintenance(w, animalType).toFixed(2)} Mcal ME`;
 
   return (
     <section className="panel panel-input" aria-labelledby="hayvan-baslik">

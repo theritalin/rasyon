@@ -30,11 +30,13 @@ KM (kg) = Yedirilen Miktar (kg) × (KM% / 100)
 **Örnek:** 10 kg Mısır Silajı (KM=%30) → `10 × 0.30 = 3.0 kg KM`
 
 ### Hedef Kuru Madde (KM) Gereksinimi / Kapasitesi
-Hayvanın günlük tüketebileceği hedef Kuru Madde (KM) kapasitesi, teorilerden bağımsız olarak standart bir endüstri referansı olan **Canlı Ağırlığın %2.5'i** alınarak hesaplanır.
+Hayvanın günlük tüketebileceği hedef Kuru Madde (KM) kapasitesi teorilerden bağımsız hesaplanır:
 ```
-Hedef KM (kg) = Canlı Ağırlık (kg) × 0.025
+Besi / Boş Düve : Hedef KM (kg) = Canlı Ağırlık × 0.025
+Kuru Gebe İnek  : Hedef KM (kg) = Canlı Ağırlık × 0.020
+Sağmal İnek     : Hedef KM (kg) = Canlı Ağırlık × 0.020 + Süt Verimi × 0.3
 ```
-**Örnek:** 500 kg hayvan → `500 × 0.025 = 12.5 kg KM / gün`
+**Örnek:** 500 kg besi hayvanı → `500 × 0.025 = 12.5 kg KM / gün`
 
 ### Lif / Selüloz İhtiyacı
 İşkembe fonksiyonlarının sağlıklı çalışması ve laktik asidoz riskinin önlenmesi için minimum lif gereksinimi:
@@ -77,14 +79,29 @@ Hayvanı bir makine gibi görür: "X kadar ağırlık, Y kadar artış istiyorsa
 
 ## 1.1 Enerji Gereksinimi (ME – Mcal/gün)
 
+NRC gereksinimleri net enerji (NE) olarak verir. Program bunları, yaklaşık 2.6 Mcal ME/kg KM'lik tipik bir rasyon için sabit verimliliklerle ME'ye çevirir:
+
+| Verimlilik | Değer | Kullanım |
+|-----------|-------|----------|
+| km | 0.65 | ME → yaşama net enerjisi (besi) |
+| kg | 0.42 | ME → büyüme net enerjisi |
+| kl | 0.64 | ME → yaşama + süt net enerjisi (süt ırkı) |
+
 **A) Yaşama Payı:**
 ```
-MEm = Canlı Ağırlık (kg) × 0.035
+SBW (aç ağırlık) = Canlı Ağırlık × 0.96
+
+Besi / Boş Düve : MEm = 0.077 × SBW^0.75 / 0.65
+Süt ırkı        : MEm = 0.080 × CA^0.75  / 0.64
 ```
 
 **B) Büyüme Payı:**
 ```
-MEg = Hedef GCAA (kg) × (Canlı Ağırlık × 0.015)
+EBW (boş vücut ağırlığı) = SBW × 0.891
+EBG (boş vücut artışı)   = GCAA × 0.956
+
+Tutulan enerji (RE) = 0.0635 × EBW^0.75 × EBG^1.097
+MEg = RE / 0.42
 ```
 
 **Toplam:**
@@ -94,21 +111,30 @@ Toplam ME = MEm + MEg
 
 **Örnek (500 kg, 1.5 kg GCAA hedefi):**
 ```
-MEm = 500 × 0.035 = 17.50 Mcal
-MEg = 1.5 × (500 × 0.015) = 1.5 × 7.5 = 11.25 Mcal
-Toplam = 28.75 Mcal/gün
+SBW = 480 kg, SBW^0.75 = 102.5
+MEm = 0.077 × 102.5 / 0.65 = 12.15 Mcal
+
+EBW = 427.7 kg, EBW^0.75 = 94.0
+RE  = 0.0635 × 94.0 × (1.434)^1.097 = 8.87 Mcal
+MEg = 8.87 / 0.42 = 21.12 Mcal
+
+Toplam = 33.26 Mcal/gün
 ```
 
 ## 1.2 Protein Gereksinimi (Ham Protein – kg/gün)
 
+Metabolik protein (MP) gereksinimi hesaplanır ve `HP = MP / 0.64` ile ham proteine çevrilir.
+
 **A) Yaşama Payı:**
 ```
-HPm = Canlı Ağırlık (kg) × 0.001
+HPm = 3.8 g × SBW^0.75 / 0.64
 ```
 
 **B) Büyüme Payı:**
 ```
-HPg = Hedef GCAA (kg) × 0.35
+Net protein (g) = GCAA × (268 − 29.4 × RE / GCAA)     (alt sınır: 60 g/kg artış)
+Verim           = SBW ≤ 300 kg ise 0.834 − 0.00114 × SBW, değilse 0.492
+HPg = Net protein / Verim / 0.64
 ```
 
 **Toplam:**
@@ -118,9 +144,10 @@ Toplam HP = HPm + HPg
 
 **Örnek (500 kg, 1.5 kg GCAA):**
 ```
-HPm = 500 × 0.001 = 0.50 kg
-HPg = 1.5 × 0.35 = 0.525 kg
-Toplam = 1.025 kg/gün
+HPm = 3.8 × 102.5 / 0.64 = 609 g = 0.61 kg
+Net protein = 1.5 × (268 − 29.4 × 8.87 / 1.5) = 141 g
+HPg = 141 / 0.492 / 0.64 = 449 g = 0.45 kg
+Toplam = 1.06 kg/gün
 ```
 
 ## 1.3 Rasyondan Sağlanan Enerji ve Protein
@@ -140,21 +167,22 @@ HP  = 2.64 × (11/100) = 0.29 kg
 
 ## 1.4 Tahmini GCAA
 
+Gereksinim formülleri tersten çözülür:
 ```
-Enerji bazlı GCAA = (Toplam ME – MEm) / (CA × 0.015)
-Protein bazlı GCAA = (Toplam HP – HPm) / 0.35
+Enerji bazlı GCAA  = [ (Toplam ME – MEm) × 0.42 / (0.0635 × EBW^0.75) ]^(1/1.097) / 0.956
+Protein bazlı GCAA = (Toplam HP – HPm) miktarını karşılayan GCAA (HPg formülünün tersi)
 Tahmini GCAA = min(Enerji bazlı, Protein bazlı)
 ```
 
 **Örnek (500kg, rasyon: 25 Mcal ME, 0.9 kg HP):**
 ```
-GCAA_enerji  = (25 – 17.5) / 7.5 = 1.0 kg
-GCAA_protein = (0.9 – 0.5) / 0.35 = 1.14 kg
-Tahmini GCAA = min(1.0, 1.14) = 1.0 kg (enerji sınırlayıcı)
+GCAA_enerji  = [ (25 – 12.15) × 0.42 / (0.0635 × 94.0) ]^(1/1.097) / 0.956 = 0.95 kg
+GCAA_protein = (0.9 – 0.61) kg HP → 0.89 kg
+Tahmini GCAA = min(0.95, 0.89) = 0.89 kg (protein sınırlayıcı)
 ```
 
-> **Not:** Kilo kaybı durumunda (negatif değer) farklı katsayılar uygulanır:
-> Enerji bazlı kayıp = fazla / (CA × 0.010), Protein bazlı kayıp = fazla / 0.25
+> **Not:** Enerji yaşama payının altındaysa açık vücut rezervinden karşılanır:
+> Kayıp = (Toplam ME – MEm) × 0.65 / (0.0635 × EBW^0.75 × 0.956^1.097). Protein açığında kayıp = açık / 0.25
 
 ---
 
@@ -295,11 +323,11 @@ En detaylı ve "hassas terazi" niteliğindeki sistemdir. Sadece "ne kadar" yendi
 
 CNCPS'te enerji gereksinimi NRC ile aynı birimde (ME, Mcal) hesaplanır:
 ```
-MEm = Canlı Ağırlık × 0.035
-MEg = Hedef GCAA × (Canlı Ağırlık × 0.015)
+MEm = 0.077 × SBW^0.75 / 0.65          (süt ırkı: 0.080 × CA^0.75 / 0.64)
+MEg = 0.0635 × EBW^0.75 × EBG^1.097 / 0.42
 Toplam ME = MEm + MEg
 ```
-> NRC ile aynı formül. Fark, rasyondan sağlanan enerjinin hesaplanmasındadır (NDFD düzeltmesi).
+> NRC ile aynı formül (bkz. 1.1). Fark, rasyondan sağlanan enerjinin hesaplanmasındadır (NDFD düzeltmesi).
 
 ## 3.2 Protein Gereksinimi (Metabolik Protein – g/gün)
 
@@ -459,12 +487,12 @@ Senkronizasyon Skoru = max(0, min(100, 100 − √Varyans × 8))
 ## 3.6 Tahmini GCAA
 
 ```
-GCAA_enerji  = (Toplam Düzeltilmiş ME – MEm) / (CA × 0.015)
+GCAA_enerji  = NRC 1.4'teki enerji formülü (Toplam Düzeltilmiş ME ile)
 GCAA_protein = (Toplam MP – MPm) / 305
 Tahmini GCAA = min(GCAA_enerji, GCAA_protein)
 ```
 
-> Kilo kaybı durumunda: enerji / (CA × 0.010), protein / 220
+> Kilo kaybı durumunda: enerji NRC 1.4'teki gibi, protein / 220
 
 ## 3.7 Yem Veritabanındaki CNCPS Değerleri
 
@@ -505,12 +533,12 @@ Tahmini GCAA = min(GCAA_enerji, GCAA_protein)
 
 | Gereksinim | NRC | INRA | CNCPS |
 |-----------|-----|------|-------|
-| Enerji (yaşama) | 17.5 Mcal | 4.4 UFB | 17.5 Mcal |
-| Enerji (büyüme) | 11.25 Mcal | 4.8 UFB | 11.25 Mcal |
-| **Enerji (toplam)** | **28.75 Mcal** | **9.2 UFB** | **28.75 Mcal** |
-| Protein (yaşama) | 0.5 kg | 344 g | 402 g |
-| Protein (büyüme) | 0.525 kg | 420 g | 458 g |
-| **Protein (toplam)** | **1.025 kg** | **764 g** | **860 g** |
+| Enerji (yaşama) | 12.15 Mcal | 4.4 UFB | 12.15 Mcal |
+| Enerji (büyüme) | 21.12 Mcal | 4.8 UFB | 21.12 Mcal |
+| **Enerji (toplam)** | **33.26 Mcal** | **9.2 UFB** | **33.26 Mcal** |
+| Protein (yaşama) | 0.61 kg | 344 g | 402 g |
+| Protein (büyüme) | 0.45 kg | 420 g | 458 g |
+| **Protein (toplam)** | **1.06 kg** | **764 g** | **860 g** |
 
 ---
 
@@ -521,7 +549,7 @@ Yeni eklenen sistem sayesinde program artık sadece erkek besi hayvanlarını de
 ## 1. Sağmal İnek (Süt Verimi) Hesaplamaları
 Süt veren bir ineğin rasyonunda, ürettiği her 1 litre süt ve bu sütün yağ oranına göre ekstra enerji ve protein hesaplanır.
 
-*   **Enerji İhtiyacı (NRC):** Yaklaşık olarak 1 kg %3.5 yağlı süt için **~0.7 Mcal ME** gerekir. Formülasyonda süt yağ oranına göre daha hassas bir çarpan kullanılır `(0.4 + (Süt Yağı × 0.085))`.
+*   **Enerji İhtiyacı (NRC ve CNCPS):** Sütün net enerjisi `NEL = 0.360 + 0.0969 × Süt Yağı (%)` Mcal/kg'dır ve `ME = NEL / 0.64` ile ME'ye çevrilir. 1 kg %3.5 yağlı süt için **~1.09 Mcal ME** gerekir.
 *   **Protein İhtiyacı (NRC):** 1 kg süt üretimi için yaklaşık **85 gram Ham Protein (HP)** eklenir.
 *   **INRA ve CNCPS:** Bu teorilerde de sütün kalitesine göre (INRA'da ~0.44 UFB, CNCPS'de ~45g MP) ekstra süt gereksinimleri otomatik eklenir.
 *   **Kuru Madde Tüketimi:** Sağmal inekler, besi hayvanlarına göre daha fazla kuru madde tüketebilir. Formülasyon `CA × %2` + `Süt Verimi × 0.3` şeklinde esnetilmiştir.
@@ -530,7 +558,7 @@ Süt veren bir ineğin rasyonunda, ürettiği her 1 litre süt ve bu sütün ya�
 Gebeliğin ilk aylarında ceninin (fötus) büyümesi yavaştır, bu yüzden rasyona büyük bir yük getirmez. Ancak **son 3 ayda** fötus çok hızlı büyür ve ek gereksinimler doğar.
 
 *   **İlk 6 Ay:** Gereksinim artışı minimum düzeydedir (Örn: +0.5 Mcal ME, +50g HP).
-*   **Son 3 Ay (Kuru Dönem):** Fötusun gelişimi için yüksek bir gereksinim artışı yaşanır. Günlük yaşama payına yaklaşık **+3.0 Mcal ME** ve **+250g HP** (NRC) eklenir. İneğin bu dönemde aşırı yağlanmaması ve kalsiyum dengesine dikkat edilmesi (süt hummasını önlemek için) çok önemlidir.
+*   **Son 3 Ay (Kuru Dönem):** Fötusun gelişimi için yüksek bir gereksinim artışı yaşanır. Günlük yaşama payına yaklaşık **+4.5 Mcal ME** ve **+250g HP** (NRC) eklenir. İneğin bu dönemde aşırı yağlanmaması ve kalsiyum dengesine dikkat edilmesi (süt hummasını önlemek için) çok önemlidir.
 
 ## Tahmini Verim (Süt vs. GCAA)
 Sistem seçilen hayvan türüne göre tahminleme yapar:
