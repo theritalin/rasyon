@@ -1,169 +1,109 @@
-import React from 'react';
 import { THEORY_META } from '../utils/theories';
+import { toNum } from '../utils/calculations';
+import NumberField from './NumberField';
 
-const InputSection = ({ 
-  weight, setWeight, 
-  targetGcaa, setTargetGcaa, 
+const ANIMAL_TYPES = [
+  { id: 'besi', label: 'Erkek Besi' },
+  { id: 'bos_duve', label: 'Boş Düve / İnek' },
+  { id: 'sagmal', label: 'Sağmal İnek' },
+  { id: 'gebe_sagmal', label: 'Gebe Sağmal İnek' },
+  { id: 'kuru_gebe', label: 'Kuru Gebe İnek' },
+];
+
+const PREGNANCY_PERIODS = [
+  { id: 'ilk_6_ay', label: 'İlk 6 Ay' },
+  { id: 'son_3_ay', label: 'Son 3 Ay' },
+];
+
+const Segmented = ({ label, options, value, onChange }) => (
+  <div className="segmented" role="group" aria-label={label}>
+    {options.map(o => (
+      <button
+        key={o.id}
+        type="button"
+        className={value === o.id ? 'active' : ''}
+        aria-pressed={value === o.id}
+        onClick={() => onChange(o.id)}
+      >
+        {o.label}
+      </button>
+    ))}
+  </div>
+);
+
+const InputSection = ({
+  weight, setWeight,
+  targetGcaa, setTargetGcaa,
   animalType, setAnimalType,
   milkYield, setMilkYield,
   milkFat, setMilkFat,
   pregnancyPeriod, setPregnancyPeriod,
-  selectedTheory, setSelectedTheory 
+  selectedTheory, setSelectedTheory,
 }) => {
-  const theories = Object.values(THEORY_META);
-  const currentTheory = THEORY_META[selectedTheory];
+  const theories = Object.values(THEORY_META).map(t => ({ id: t.id, label: t.name }));
+  const w = toNum(weight);
+  const isGrowing = animalType === 'besi' || animalType === 'bos_duve';
+  const isLactating = animalType === 'sagmal' || animalType === 'gebe_sagmal';
+  const isPregnant = animalType === 'gebe_sagmal' || animalType === 'kuru_gebe';
 
-  const animalTypes = [
-    { id: 'besi', label: 'Erkek Besi' },
-    { id: 'bos_duve', label: 'Boş Düve / İnek' },
-    { id: 'sagmal', label: 'Sağmal İnek' },
-    { id: 'gebe_sagmal', label: 'Gebe Sağmal İnek' },
-    { id: 'kuru_gebe', label: 'Kuru Gebe İnek' }
-  ];
-
-  const getMaintenanceInfo = () => {
-    const w = Number(weight) || 0;
-    if (w <= 0) return null;
-    
-    if (selectedTheory === 'inra') {
-      const ufbM = 1.4 + (0.006 * w);
-      return `${ufbM.toFixed(2)} UFB`;
-    } else {
-      const meM = w * 0.035;
-      return `${meM.toFixed(2)} Mcal ME`;
-    }
-  };
+  const maintenance = selectedTheory === 'inra'
+    ? `${(1.4 + 0.006 * w).toFixed(2)} UFB`
+    : `${(w * 0.035).toFixed(2)} Mcal ME`;
 
   return (
-    <div className="glass-panel">
-      <h2 className="panel-title">
-        <span>🐄</span> Hayvan Bilgileri
-      </h2>
+    <section className="panel panel-input" aria-labelledby="hayvan-baslik">
+      <h2 className="panel-title" id="hayvan-baslik">Hayvan Bilgileri</h2>
 
-      {/* Theory Selector */}
-      <div className="form-group">
-        <label>Hesaplama Teorisi</label>
-        <div className="theory-selector">
-          {theories.map(t => (
-            <button
-              key={t.id}
-              className={`theory-btn ${selectedTheory === t.id ? 'active' : ''}`}
-              onClick={() => setSelectedTheory(t.id)}
-            >
-              <span className="theory-flag">{t.flag}</span>
-              <span className="theory-name">{t.name}</span>
-            </button>
-          ))}
-        </div>
-        <div className="theory-description">
-          <span className="theory-desc-icon">{currentTheory.flag}</span>
-          <span>{currentTheory.subtitle}</span>
-        </div>
+      <div className="field">
+        <span className="field-label">Hesaplama Sistemi</span>
+        <Segmented label="Hesaplama sistemi" options={theories} value={selectedTheory} onChange={setSelectedTheory} />
+        <p className="field-hint">{THEORY_META[selectedTheory].subtitle}</p>
       </div>
-      
-      {/* Animal Type Selector */}
-      <div className="form-group">
-        <label>Hayvan Tipi ve Durumu</label>
-        <select 
-          value={animalType} 
-          onChange={(e) => setAnimalType(e.target.value)}
-          className="animal-type-select"
-          style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.2)', backgroundColor: 'rgba(255,255,255,0.1)', color: '#fff', fontSize: '1rem', marginTop: '0.5rem' }}
-        >
-          {animalTypes.map(t => (
-            <option key={t.id} value={t.id} style={{ color: '#000' }}>{t.label}</option>
-          ))}
+
+      <div className="field">
+        <label htmlFor="animal-type">Hayvan Tipi ve Durumu</label>
+        <select id="animal-type" value={animalType} onChange={e => setAnimalType(e.target.value)}>
+          {ANIMAL_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
         </select>
       </div>
 
-      <div className="form-group">
-        <label>Canlı Ağırlık (kg)</label>
-        <input 
-          type="text" 
-          inputMode="decimal"
-          value={weight} 
-          onChange={e => {
-            const val = e.target.value.replace(',', '.');
-            if (val === '' || /^\d*\.?\d*$/.test(val)) setWeight(val);
-          }} 
-          min="50" 
-          max="1500" 
-          step="50" 
+      <div className="field-grid">
+        <NumberField
+          label="Canlı Ağırlık"
+          unit="kg"
+          value={weight}
+          onChange={setWeight}
+          step={10}
+          max={1500}
+          hint={w > 0 ? `Yaşama payı: ${maintenance}` : 'Hesaplama için ağırlık girin'}
         />
-        {Number(weight) > 0 && (
-          <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.7)', marginTop: '0.4rem' }}>
-            <em>Yaşama Payı (Enerji): <strong>{getMaintenanceInfo()}</strong></em>
-          </div>
+
+        {isGrowing && (
+          <NumberField
+            label="Hedef Günlük Artış (GCAA)"
+            unit="kg/gün"
+            value={targetGcaa}
+            onChange={setTargetGcaa}
+            step={0.1}
+            max={3}
+          />
+        )}
+
+        {isLactating && (
+          <>
+            <NumberField label="Günlük Süt Verimi" unit="L" value={milkYield} onChange={setMilkYield} step={1} max={80} />
+            <NumberField label="Süt Yağ Oranı" unit="%" value={milkFat} onChange={setMilkFat} step={0.1} max={8} />
+          </>
         )}
       </div>
 
-      {(animalType === 'besi' || animalType === 'bos_duve') && (
-        <div className="form-group">
-          <label>Hedef Günlük Canlı Ağırlık Artışı (GCAA) (kg)</label>
-          <input 
-            type="text" 
-            inputMode="decimal"
-            value={targetGcaa} 
-            onChange={e => {
-              const val = e.target.value.replace(',', '.');
-              if (val === '' || /^\d*\.?\d*$/.test(val)) setTargetGcaa(val);
-            }} 
-            min="0" 
-            max="3" 
-            step="0.1" 
-          />
+      {isPregnant && (
+        <div className="field">
+          <span className="field-label">Gebelik Dönemi</span>
+          <Segmented label="Gebelik dönemi" options={PREGNANCY_PERIODS} value={pregnancyPeriod} onChange={setPregnancyPeriod} />
         </div>
       )}
-
-      {(animalType === 'sagmal' || animalType === 'gebe_sagmal') && (
-        <>
-          <div className="form-group">
-            <label>Günlük Süt Verimi (Litre)</label>
-            <input 
-              type="text" 
-              inputMode="decimal"
-              value={milkYield} 
-              onChange={e => {
-                const val = e.target.value.replace(',', '.');
-                if (val === '' || /^\d*\.?\d*$/.test(val)) setMilkYield(val);
-              }} 
-            />
-          </div>
-          <div className="form-group">
-            <label>Süt Yağ Oranı (%)</label>
-            <input 
-              type="text" 
-              inputMode="decimal"
-              value={milkFat} 
-              onChange={e => {
-                const val = e.target.value.replace(',', '.');
-                if (val === '' || /^\d*\.?\d*$/.test(val)) setMilkFat(val);
-              }} 
-            />
-          </div>
-        </>
-      )}
-
-      {(animalType === 'gebe_sagmal' || animalType === 'kuru_gebe') && (
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label>Gebelik Dönemi</label>
-          <div className="theory-selector" style={{ marginTop: '0.5rem' }}>
-            <button
-              className={`theory-btn ${pregnancyPeriod === 'ilk_6_ay' ? 'active' : ''}`}
-              onClick={() => setPregnancyPeriod('ilk_6_ay')}
-            >
-              <span className="theory-name">İlk 6 Ay</span>
-            </button>
-            <button
-              className={`theory-btn ${pregnancyPeriod === 'son_3_ay' ? 'active' : ''}`}
-              onClick={() => setPregnancyPeriod('son_3_ay')}
-            >
-              <span className="theory-name">Son 3 Ay</span>
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+    </section>
   );
 };
 

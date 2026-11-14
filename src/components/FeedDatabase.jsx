@@ -1,96 +1,180 @@
-import React, { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { toNum } from '../utils/calculations';
+import NumberField from './NumberField';
 
-const FeedDatabase = ({ feedsDb, onUpdateFeed, onAddFeed }) => {
-  const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState(null);
+const NEW_FEED = {
+  name: '', type: 'kesif', dm: '88', cp: '', me: '', fb: '', cb: '', price: '',
+  ufl: '0.8', ufb: '0.8', pdie: '80', pdin: '80', kd: '8', ndfd: '45',
+};
 
-  const startEdit = (feed) => {
-    setEditingId(feed.id);
-    setEditForm({ ...feed });
+const BASIC_FIELDS = [
+  { key: 'dm', label: 'Kuru Madde', unit: '%', max: 100 },
+  { key: 'cp', label: 'Ham Protein', unit: '%', max: 100 },
+  { key: 'me', label: 'ME', unit: 'Mcal/kg', max: 5 },
+  { key: 'fb', label: 'Lif (Selüloz)', unit: '%', max: 100 },
+  { key: 'cb', label: 'Karbonhidrat', unit: '%', max: 100 },
+  { key: 'price', label: 'Fiyat', unit: '₺/kg' },
+];
+
+const ADVANCED_FIELDS = [
+  { key: 'ufb', label: 'UFB (INRA)', unit: '/kg KM', max: 2 },
+  { key: 'pdie', label: 'PDIE (INRA)', unit: 'g/kg', max: 500 },
+  { key: 'pdin', label: 'PDIN (INRA)', unit: 'g/kg', max: 500 },
+  { key: 'kd', label: 'kd (CNCPS)', unit: '%/saat', max: 50 },
+  { key: 'ndfd', label: 'NDFD (CNCPS)', unit: '%', max: 100 },
+];
+
+const NUMERIC_KEYS = [...BASIC_FIELDS, ...ADVANCED_FIELDS].map(f => f.key);
+
+const validate = (form) => {
+  if (!form.name.trim()) return 'Yem adı boş olamaz.';
+  const dm = toNum(form.dm);
+  if (dm <= 0 || dm > 100) return 'Kuru madde %1 ile %100 arasında olmalıdır.';
+  if (toNum(form.me) <= 0) return 'ME değeri sıfırdan büyük olmalıdır.';
+  for (const f of [...BASIC_FIELDS, ...ADVANCED_FIELDS]) {
+    if (f.max !== undefined && toNum(form[f.key]) > f.max) return `${f.label} en fazla ${f.max} olabilir.`;
+  }
+  return null;
+};
+
+const FeedDatabase = ({ feedsDb, isCustomFeed, onUpdateFeed, onAddFeed, onDeleteFeed, onResetFeeds }) => {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [form, setForm] = useState(null); // null = kapalı; id yoksa yeni yem
+  const [error, setError] = useState(null);
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (form && !dialog.open) dialog.showModal();
+    if (!form && dialog.open) dialog.close();
+  }, [form]);
+
+  const openForm = (feed) => {
+    setError(null);
+    if (!feed) return setForm({ ...NEW_FEED });
+    const asText = { ...feed };
+    NUMERIC_KEYS.forEach(k => { asText[k] = feed[k] === undefined || feed[k] === null ? '' : String(feed[k]); });
+    setForm(asText);
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setEditForm(null);
+  const closeForm = () => setForm(null);
+  const setField = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
+
+  const save = (e) => {
+    e.preventDefault();
+    const problem = validate(form);
+    if (problem) return setError(problem);
+    const feed = { ...form, name: form.name.trim() };
+    NUMERIC_KEYS.forEach(k => { feed[k] = toNum(form[k]); });
+    if (form.price === '') feed.price = '';
+    if (form.id === undefined) onAddFeed(feed); else onUpdateFeed(feed);
+    closeForm();
   };
 
-  const saveEdit = () => {
-    onUpdateFeed(editForm);
-    cancelEdit();
+  const remove = () => {
+    if (window.confirm(`"${form.name}" yemini silmek istediğinize emin misiniz? Rasyondan da kaldırılır.`)) {
+      onDeleteFeed(form.id);
+      closeForm();
+    }
   };
 
-  const handleChange = (e, field) => {
-    let val = e.target.value;
-    if (field !== 'name' && field !== 'type') val = Number(val);
-    setEditForm(prev => ({ ...prev, [field]: val }));
-  };
+  const q = query.trim().toLocaleLowerCase('tr');
+  const visible = q ? feedsDb.filter(f => f.name.toLocaleLowerCase('tr').includes(q)) : feedsDb;
 
   return (
-    <div className="glass-panel">
-      <div className="flex-between mb-4">
-        <h2 className="panel-title" style={{ margin: 0, border: 'none', padding: 0 }}>
-          <span>📚</span> Yem Kaynakları (Veritabanı)
-        </h2>
-        <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-          * Değerler KM (Kuru Madde) bazındadır
-        </span>
+    <section className="panel panel-feeds" aria-labelledby="yem-baslik">
+      <div className="panel-head">
+        <h2 className="panel-title" id="yem-baslik">Yem Kaynakları</h2>
+        <button type="button" className="btn btn-secondary btn-sm" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+          {open ? 'Gizle' : `Göster (${feedsDb.length})`}
+        </button>
       </div>
+      <p className="panel-sub">Besin değerleri kuru madde (KM) bazındadır. Kendi analiz değerlerinize göre düzenleyebilirsiniz.</p>
 
-      <div className="table-container">
-        <table>
-          <thead>
-            <tr>
-              <th>Yem Adı</th>
-              <th>Tür</th>
-              <th>KM %</th>
-              <th>Protein %</th>
-              <th>ME (Mcal)</th>
-              <th>Lif %</th>
-              <th>İşlem</th>
-            </tr>
-          </thead>
-          <tbody>
-            {feedsDb.map(feed => (
-              <tr key={feed.id}>
-                {editingId === feed.id ? (
-                  <>
-                    <td data-label="Yem Adı"><input type="text" value={editForm.name} onChange={e => handleChange(e, 'name')} /></td>
-                    <td data-label="Tür">
-                      <select value={editForm.type} onChange={e => handleChange(e, 'type')}>
-                        <option value="kesif">Kesif (Fabrika/Dane)</option>
-                        <option value="kaba">Kaba (Ot/Saman/Silaj)</option>
-                      </select>
-                    </td>
-                    <td data-label="KM %"><input type="number" step="0.1" value={editForm.dm} onChange={e => handleChange(e, 'dm')} /></td>
-                    <td data-label="Protein %"><input type="number" step="0.1" value={editForm.cp} onChange={e => handleChange(e, 'cp')} /></td>
-                    <td data-label="ME (Mcal)"><input type="number" step="0.1" value={editForm.me} onChange={e => handleChange(e, 'me')} /></td>
-                    <td data-label="Lif %"><input type="number" step="0.1" value={editForm.fb} onChange={e => handleChange(e, 'fb')} /></td>
-                    <td data-label="İşlem">
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button className="btn-primary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={saveEdit}>Kaydet</button>
-                        <button className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={cancelEdit}>İptal</button>
-                      </div>
-                    </td>
-                  </>
-                ) : (
-                  <>
-                    <td data-label="Yem Adı">{feed.name}</td>
-                    <td data-label="Tür">{feed.type === 'kaba' ? 'Kaba Yem' : 'Kesif Yem'}</td>
-                    <td data-label="KM %">{feed.dm}</td>
-                    <td data-label="Protein %">{feed.cp}</td>
-                    <td data-label="ME (Mcal)">{feed.me}</td>
-                    <td data-label="Lif %">{feed.fb}</td>
-                    <td data-label="İşlem">
-                      <button className="btn-secondary" style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }} onClick={() => startEdit(feed)}>Düzenle</button>
-                    </td>
-                  </>
-                )}
-              </tr>
+      {open && (
+        <>
+          <div className="feed-toolbar">
+            <input
+              type="search"
+              placeholder="Yem ara…"
+              aria-label="Yem ara"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+            />
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => openForm(null)}>+ Yeni Yem</button>
+          </div>
+
+          <ul className="feed-list">
+            {visible.map(feed => (
+              <li key={feed.id} className="feed-row">
+                <div className="feed-main">
+                  <span className="feed-name">{feed.name}</span>
+                  <span className={`tag tag-${feed.type}`}>{feed.type === 'kaba' ? 'Kaba' : 'Kesif'}</span>
+                </div>
+                <dl className="stats stats-compact">
+                  <div><dt>KM %</dt><dd>{feed.dm}</dd></div>
+                  <div><dt>HP %</dt><dd>{feed.cp}</dd></div>
+                  <div><dt>ME</dt><dd>{feed.me}</dd></div>
+                  <div><dt>Lif %</dt><dd>{feed.fb}</dd></div>
+                </dl>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => openForm(feed)} aria-label={`${feed.name} yemini düzenle`}>Düzenle</button>
+              </li>
             ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+            {visible.length === 0 && <li className="empty">Aramayla eşleşen yem bulunamadı.</li>}
+          </ul>
+
+          <button type="button" className="btn btn-link" onClick={onResetFeeds}>Yem değerlerini varsayılana döndür</button>
+        </>
+      )}
+
+      <dialog ref={dialogRef} className="sheet" onClose={closeForm} aria-labelledby="yem-form-baslik">
+        {form && (
+          <form onSubmit={save} noValidate>
+            <h3 id="yem-form-baslik">{form.id === undefined ? 'Yeni Yem Ekle' : 'Yemi Düzenle'}</h3>
+
+            <div className="field">
+              <label htmlFor="feed-name">Yem Adı</label>
+              <input id="feed-name" type="text" value={form.name} onChange={e => setField('name', e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="feed-type">Tür</label>
+              <select id="feed-type" value={form.type} onChange={e => setField('type', e.target.value)}>
+                <option value="kesif">Kesif (Fabrika / Dane / Küspe)</option>
+                <option value="kaba">Kaba (Ot / Saman / Silaj)</option>
+              </select>
+            </div>
+
+            <div className="field-grid field-grid-compact">
+              {BASIC_FIELDS.map(f => (
+                <NumberField key={f.key} label={f.label} unit={f.unit} value={form[f.key]} onChange={val => setField(f.key, val)} />
+              ))}
+            </div>
+
+            <details className="advanced">
+              <summary>INRA ve CNCPS değerleri</summary>
+              <div className="field-grid field-grid-compact">
+                {ADVANCED_FIELDS.map(f => (
+                  <NumberField key={f.key} label={f.label} unit={f.unit} value={form[f.key]} onChange={val => setField(f.key, val)} />
+                ))}
+              </div>
+            </details>
+
+            {error && <div className="alert alert-danger" role="alert">{error}</div>}
+
+            <div className="sheet-actions">
+              {form.id !== undefined && isCustomFeed(form.id) && (
+                <button type="button" className="btn btn-ghost-danger" onClick={remove}>Sil</button>
+              )}
+              <span className="spacer" />
+              <button type="button" className="btn btn-secondary" onClick={closeForm}>İptal</button>
+              <button type="submit" className="btn btn-primary">Kaydet</button>
+            </div>
+          </form>
+        )}
+      </dialog>
+    </section>
   );
 };
 

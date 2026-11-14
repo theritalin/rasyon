@@ -1,204 +1,122 @@
-import React, { useState } from 'react';
-import { convertToDM } from '../utils/calculations';
+import { useState } from 'react';
+import { convertToDM, toNum } from '../utils/calculations';
+import { getFeedContribution } from '../utils/theories';
+import NumberField from './NumberField';
 
-const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onUpdateFeedPrice, onRemove, onClear, totals, theoryMeta, selectedTheory }) => {
+const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onUpdateFeedPrice, onRemove, onClear, totals, totalCost, theoryMeta, selectedTheory }) => {
   const [selectedFeedId, setSelectedFeedId] = useState('');
   const [amount, setAmount] = useState('');
 
+  const canAdd = selectedFeedId !== '' && toNum(amount) > 0;
+  const proteinDecimals = selectedTheory === 'nrc' ? 2 : 0;
+
   const handleAdd = () => {
-    if (!selectedFeedId || !amount || Number(amount) <= 0) return;
-    onAdd(Number(selectedFeedId), Number(amount));
+    if (!canAdd) return;
+    onAdd(Number(selectedFeedId), toNum(amount));
     setAmount('');
+    setSelectedFeedId('');
   };
 
-  const getEnergyValue = (feed, dmKg) => {
-    switch (selectedTheory) {
-      case 'inra':
-        return dmKg * (feed.ufb || 0);
-      case 'cncps': {
-        const ndfd = feed.ndfd || 45;
-        const ndfdCorrection = 1 + (ndfd - 45) * 0.002;
-        return dmKg * feed.me * ndfdCorrection;
-      }
-      default:
-        return dmKg * feed.me;
-    }
-  };
+  const feedGroups = [
+    { label: 'Kaba Yemler', feeds: feedsDb.filter(f => f.type === 'kaba') },
+    { label: 'Kesif Yemler', feeds: feedsDb.filter(f => f.type !== 'kaba') },
+  ];
 
-  const getProteinValue = (feed, dmKg) => {
-    switch (selectedTheory) {
-      case 'inra': {
-        // Per-row: min(PDIE, PDIN) contribution for display
-        // (actual ration total uses ration-level min)
-        const pdie = dmKg * (feed.pdie || 0);
-        const pdin = dmKg * (feed.pdin || 0);
-        return Math.min(pdie, pdin);
-      }
-      case 'cncps': {
-        const kd = feed.kd || 8;
-        const kp = feed.type === 'kesif' ? 5 : 3.5;
-        const cpGrams = dmKg * (feed.cp / 100) * 1000;
-        const rdpFraction = 0.20 + 0.65 * (kd / (kd + kp));
-        const rupFraction = 0.65 * (kp / (kd + kp));
-        const rdp = cpGrams * rdpFraction;
-        const rup = cpGrams * rupFraction;
-        const mpFromMicrobes = rdp * 0.85 * 0.64;
-        const mpFromRup = rup * 0.80;
-        return mpFromMicrobes + mpFromRup;
-      }
-      default:
-        return dmKg * (feed.cp / 100);
-    }
-  };
+  const proteinStats = (c) => selectedTheory === 'inra'
+    ? [
+        { label: 'PDIE (g)', value: c.pdie.toFixed(0) },
+        { label: 'PDIN (g)', value: c.pdin.toFixed(0) },
+      ]
+    : [{ label: `Protein (${theoryMeta.proteinUnit})`, value: c.protein.toFixed(proteinDecimals) }];
 
-  const formatProtein = (val) => {
-    if (selectedTheory === 'nrc') return val.toFixed(2);
-    return val.toFixed(0);
-  };
-
-  const totalCost = rationItems.reduce((sum, item) => {
-    const feed = feedsDb.find(f => f.id === item.feedId);
-    return sum + (Number(item.amount) || 0) * (Number(feed?.price) || 0);
-  }, 0);
+  const energyLabel = `Enerji (${theoryMeta.energyUnit})`;
 
   return (
-    <div className="glass-panel">
-      <div className="flex-between mb-4">
-        <h2 className="panel-title" style={{ margin: 0, padding: 0, border: 'none' }}>
-          <span>⚖️</span> Rasyon Oluşturucu
-          <span className="theory-badge-sm">{theoryMeta.flag}</span>
-        </h2>
+    <section className="panel panel-builder" aria-labelledby="rasyon-baslik">
+      <div className="panel-head">
+        <h2 className="panel-title" id="rasyon-baslik">Rasyon</h2>
         {rationItems.length > 0 && (
-          <button className="btn-danger" onClick={onClear} style={{ fontSize: '0.8rem', padding: '0.4rem 0.8rem' }}>
-            Rasyonu Temizle
-          </button>
+          <button type="button" className="btn btn-ghost-danger btn-sm" onClick={onClear}>Rasyonu Temizle</button>
         )}
       </div>
 
-      <div className="form-row mb-4">
-        <div>
-          <label className="mb-2" style={{ display: 'block', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Yem Seç</label>
-          <select 
-            value={selectedFeedId} 
-            onChange={e => setSelectedFeedId(e.target.value)}
-          >
-            <option value="" disabled>-- Yem Kaynağı Seçin --</option>
-            {feedsDb.map(f => (
-              <option key={f.id} value={f.id}>{f.name} ({f.type === 'kaba' ? 'Kaba' : 'Kesif'})</option>
+      <div className="add-form">
+        <div className="field add-feed">
+          <label htmlFor="feed-select">Yem</label>
+          <select id="feed-select" value={selectedFeedId} onChange={e => setSelectedFeedId(e.target.value)}>
+            <option value="" disabled>Yem seçin…</option>
+            {feedGroups.map(g => (
+              <optgroup key={g.label} label={g.label}>
+                {g.feeds.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </optgroup>
             ))}
           </select>
         </div>
-        <div className="ration-input-group">
-          <div style={{ flex: 1 }}>
-            <label className="mb-2" style={{ display: 'block', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Miktar (kg)</label>
-            <input 
-              type="text" 
-              inputMode="decimal"
-              value={amount} 
-              onChange={e => {
-                const val = e.target.value.replace(',', '.');
-                if (val === '' || /^\d*\.?\d*$/.test(val)) setAmount(val);
-              }} 
-              min="0.1" 
-              step="0.1" 
-              placeholder="0.0" 
-            />
-          </div>
-          <button className="btn-primary" onClick={handleAdd}>Ekle</button>
+        <div className="add-amount">
+          <NumberField label="Miktar" unit="kg" value={amount} onChange={setAmount} step={0.5} placeholder="0" onEnter={handleAdd} />
         </div>
+        <button type="button" className="btn btn-primary add-btn" onClick={handleAdd} disabled={!canAdd}>Ekle</button>
       </div>
 
-      <div className="table-container mt-4">
-        <table>
-          <thead>
-            <tr>
-              <th>Yem Adı</th>
-              <th>Miktar (kg)</th>
-              <th>KM (kg)</th>
-              <th>{theoryMeta.energyLabel.split('(')[0].trim()} ({theoryMeta.energyUnit})</th>
-              <th>{theoryMeta.proteinLabel.split('(')[0].trim()} ({theoryMeta.proteinUnit})</th>
-              <th>Fiyat (₺/kg)</th>
-              <th>Maliyet (₺)</th>
-              <th>İşlem</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rationItems.length === 0 ? (
-              <tr>
-                <td colSpan="8" style={{ textAlign: 'center', color: 'var(--text-secondary)' }}>
-                  Henüz rasyona yem eklenmedi.
-                </td>
-              </tr>
-            ) : (
-              rationItems.map(item => {
-                const feed = feedsDb.find(f => f.id === item.feedId);
-                if (!feed) return null;
-                const km = convertToDM(item.amount, feed.dm);
-                const energyVal = getEnergyValue(feed, km);
-                const proteinVal = getProteinValue(feed, km);
-                const cost = (Number(item.amount) || 0) * (Number(feed.price) || 0);
-                
-                return (
-                  <tr key={item.id}>
-                    <td data-label="Yem Adı">{feed.name}</td>
-                    <td data-label="Miktar (kg)">
-                      <input 
-                        type="text" 
-                        inputMode="decimal"
-                        value={item.amount} 
-                        onChange={e => {
-                          const val = e.target.value.replace(',', '.');
-                          if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                            onUpdateAmount(item.id, val);
-                          }
-                        }}
-                        min="0" 
-                        step="0.1"
-                        style={{ width: '80px', padding: '0.4rem', background: 'rgba(255,255,255,0.05)' }} 
-                      />
-                    </td>
-                    <td data-label="KM (kg)">{km.toFixed(2)}</td>
-                    <td data-label={`${theoryMeta.energyLabel.split('(')[0].trim()} (${theoryMeta.energyUnit})`}>{energyVal.toFixed(2)}</td>
-                    <td data-label={`${theoryMeta.proteinLabel.split('(')[0].trim()} (${theoryMeta.proteinUnit})`}>{formatProtein(proteinVal)}</td>
-                    <td data-label="Fiyat (₺/kg)">
-                      <input 
-                        type="text" 
-                        inputMode="decimal"
-                        value={feed.price || ''} 
-                        onChange={e => {
-                          const val = e.target.value.replace(',', '.');
-                          if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                            onUpdateFeedPrice(feed.id, val);
-                          }
-                        }}
-                        placeholder="0.00"
-                        style={{ width: '70px', padding: '0.4rem', background: 'rgba(255,255,255,0.05)' }} 
-                      />
-                    </td>
-                    <td data-label="Maliyet (₺)">{cost.toFixed(2)}</td>
-                    <td data-label="İşlem">
-                      <button className="btn-danger" onClick={() => onRemove(item.id)}>Kaldır</button>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-            {rationItems.length > 0 && (
-              <tr style={{ background: 'rgba(16, 185, 129, 0.1)', fontWeight: 'bold' }}>
-                <td data-label="Yem Adı">TOPLAM</td>
-                <td data-label="Miktar (kg)">{totals.asFed.toFixed(2)} kg</td>
-                <td data-label="KM (kg)">{totals.dm.toFixed(2)} kg</td>
-                <td data-label={`${theoryMeta.energyLabel.split('(')[0].trim()} (${theoryMeta.energyUnit})`}>{totals.energy.toFixed(2)}</td>
-                <td data-label={`${theoryMeta.proteinLabel.split('(')[0].trim()} (${theoryMeta.proteinUnit})`}>{formatProtein(totals.protein)}</td>
-                <td data-label="Fiyat (₺/kg)">-</td>
-                <td data-label="Maliyet (₺)">{totalCost.toFixed(2)} ₺</td>
-                <td data-label="İşlem">-</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      {rationItems.length === 0 ? (
+        <p className="empty">Henüz rasyona yem eklenmedi. Yukarıdan bir yem ve günlük miktarını seçin.</p>
+      ) : (
+        <>
+          <ul className="ration-list">
+            {rationItems.map(item => {
+              const feed = feedsDb.find(f => f.id === item.feedId);
+              if (!feed) return null;
+              const km = convertToDM(item.amount, feed.dm);
+              const c = getFeedContribution(selectedTheory, feed, km);
+              const cost = toNum(item.amount) * toNum(feed.price);
+              const stats = [
+                { label: 'KM (kg)', value: km.toFixed(2) },
+                { label: energyLabel, value: c.energy.toFixed(2) },
+                ...proteinStats(c),
+                { label: 'Maliyet (₺)', value: cost.toFixed(2) },
+              ];
+
+              return (
+                <li key={item.id} className="ration-item">
+                  <div className="ration-item-head">
+                    <span className="ration-item-name">{feed.name}</span>
+                    <span className={`tag tag-${feed.type}`}>{feed.type === 'kaba' ? 'Kaba' : 'Kesif'}</span>
+                    <button type="button" className="icon-btn" onClick={() => onRemove(item.id)} aria-label={`${feed.name} yemini rasyondan kaldır`}>
+                      <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
+                    </button>
+                  </div>
+                  <div className="ration-item-body">
+                    <div className="ration-item-inputs">
+                      <NumberField label="Miktar" unit="kg" value={item.amount} onChange={val => onUpdateAmount(item.id, val)} step={0.5} />
+                      <NumberField label="Fiyat" unit="₺/kg" value={feed.price ?? ''} onChange={val => onUpdateFeedPrice(feed.id, val)} placeholder="0" />
+                    </div>
+                    <dl className="stats">
+                      {stats.map(s => (
+                        <div key={s.label}><dt>{s.label}</dt><dd>{s.value}</dd></div>
+                      ))}
+                    </dl>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="ration-total">
+            <span className="ration-total-title">Günlük Toplam</span>
+            <dl className="stats">
+              <div><dt>Yem (kg)</dt><dd>{totals.asFed.toFixed(2)}</dd></div>
+              <div><dt>KM (kg)</dt><dd>{totals.dm.toFixed(2)}</dd></div>
+              <div><dt>{energyLabel}</dt><dd>{totals.energy.toFixed(2)}</dd></div>
+              <div>
+                <dt>{selectedTheory === 'inra' ? 'PDI (g)' : `Protein (${theoryMeta.proteinUnit})`}</dt>
+                <dd>{totals.protein.toFixed(proteinDecimals)}</dd>
+              </div>
+              <div><dt>Maliyet (₺)</dt><dd>{totalCost.toFixed(2)}</dd></div>
+            </dl>
+          </div>
+        </>
+      )}
+    </section>
   );
 };
 

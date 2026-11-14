@@ -1,207 +1,177 @@
-import React from 'react';
+import { getStatus } from '../utils/status';
+
+const Metric = ({ label, provided, required, unit, mode = 'min', decimals = 2 }) => {
+  const status = getStatus(provided, required, mode);
+  return (
+    <div className={`metric ${status.level}`}>
+      <div className="metric-top">
+        <span className="metric-label">{label}</span>
+        <span className="badge">{status.label}</span>
+      </div>
+      <div className="metric-value">
+        {provided.toFixed(decimals)}
+        <span className="metric-target"> / {required.toFixed(decimals)} {unit}</span>
+      </div>
+      <div
+        className="progress"
+        role="progressbar"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(Math.min(100, status.percent))}
+      >
+        <div className="progress-fill" style={{ width: `${Math.min(100, status.percent)}%` }} />
+      </div>
+      <div className="metric-percent">%{status.percent.toFixed(0)}</div>
+    </div>
+  );
+};
+
+const NOTES = {
+  besi: 'Besi hayvanlarında kesif yem oranı %80’lere çıkabilir; asidoz riskine karşı mutlaka karbonat (soda) eklenmelidir. Günlük canlı ağırlık artışı rasyonun enerjisiyle doğrudan ilişkilidir.',
+  bos_duve: 'Boş düvelerde hızlı yağlanmayı önlemek için aşırı enerjiden kaçınılmalı, iskelet ve kas gelişimini destekleyen dengeli bir büyüme hedeflenmelidir.',
+  sagmal: 'Sağmal ineklerde işkembe sağlığı ve süt yağının düşmemesi için kaba yem oranı KM bazında en az %40 olmalıdır. Yüksek süt verimi için enerji kadar protein kalitesi de önemlidir.',
+  gebe: 'Gebeliğin son 3 ayında (kuru dönem) süt hummasını önlemek için kalsiyum alımı kısıtlanmalı, doğum felci ve ketozise karşı enerji dengesine dikkat edilmelidir.',
+};
 
 const ResultsDashboard = ({ requirements, totals, targetGcaa, estimatedProduction, animalType, theoryMeta, selectedTheory }) => {
-  const getStatusClass = (provided, required, isMax = false) => {
-    if (required === 0) return 'info';
-    const ratio = provided / required;
-    if (isMax) {
-      if (ratio > 1.2) return 'danger';
-      if (ratio > 1.0) return 'warning';
-      return 'success';
-    } else {
-      if (ratio < 0.8) return 'danger';
-      if (ratio < 0.95) return 'warning';
-      return 'success';
-    }
-  };
+  const hasRation = totals.dm > 0;
+  const hasAnimal = requirements.energy > 0;
+  const isLactating = animalType === 'sagmal' || animalType === 'gebe_sagmal';
+  const isPregnant = animalType === 'gebe_sagmal' || animalType === 'kuru_gebe';
+  const showTarget = animalType === 'besi' || animalType === 'bos_duve';
 
-  const MetricBlock = ({ label, provided, required, unit, isMax = false, decimals = 2 }) => {
-    const status = getStatusClass(provided, required, isMax);
-    const percent = required > 0 ? Math.min(100, (provided / required) * 100) : 0;
-    
-    return (
-      <div className={`metric-card ${status}`}>
-        <div className="metric-label">{label}</div>
-        <div className="metric-value">
-          {provided.toFixed(decimals)} <span className="metric-unit">/ {required.toFixed(decimals)} {unit}</span>
-        </div>
-        <div className="progress-bg">
-          <div 
-            className="progress-fill" 
-            style={{ 
-              width: `${percent}%`, 
-              backgroundColor: status === 'danger' ? 'var(--danger)' : status === 'warning' ? 'var(--warning)' : 'var(--success)' 
-            }} 
-          />
-        </div>
-      </div>
-    );
-  };
+  const dmStatus = getStatus(totals.dm, requirements.targetDM, 'range');
+  const balanced = hasRation && hasAnimal
+    && totals.energy >= requirements.energy
+    && totals.protein >= requirements.protein
+    && totals.fiber >= requirements.minFiber
+    && dmStatus.percent <= 110;
 
   return (
-    <div className="glass-panel">
-      <h2 className="panel-title">
-        <span>📊</span> Rasyon Analizi
-        <span className="theory-badge">{theoryMeta.flag} {theoryMeta.name}</span>
-      </h2>
-
-      <div className="alert alert-info" style={{ marginBottom: '1.5rem', backgroundColor: 'rgba(59, 130, 246, 0.15)', borderLeft: '4px solid #3b82f6' }}>
-        <strong>Genel Rasyon Notları:</strong>
-        <ul style={{ margin: '0.5rem 0 0 1.5rem', padding: 0, fontSize: '0.9rem' }}>
-          {animalType === 'besi' && (
-            <li>Besi hayvanlarında kesif yem oranı %80'lere çıkabilir ancak asidoz riskine karşı mutlaka karbonat (soda) eklenmelidir. Günlük canlı ağırlık artışı hedefi rasyonun enerjisiyle doğrudan ilişkilidir.</li>
-          )}
-          {animalType === 'bos_duve' && (
-            <li>Boş düvelerde hızlı yağlanmayı önlemek için aşırı enerjiden kaçınılmalı, iskelet ve kas gelişimini destekleyecek dengeli bir büyüme hedeflenmelidir.</li>
-          )}
-          {(animalType === 'sagmal' || animalType === 'gebe_sagmal') && (
-            <li>Sağmal ineklerde işkembe sağlığı ve süt yağı oranının düşmemesi için kaba yem oranı KM bazında <strong>en az %40</strong> olmalıdır. Yüksek süt verimi için rasyonun enerjisi kadar protein kalitesi de önemlidir.</li>
-          )}
-          {(animalType === 'gebe_sagmal' || animalType === 'kuru_gebe') && (
-            <li>Gebe hayvanların son 3 ayında (kuru dönem) süt hummasını önlemek için kalsiyum alımı kısıtlanmalı, doğum felci ve ketozise karşı enerji dengesine dikkat edilmelidir.</li>
-          )}
-        </ul>
+    <section className="panel panel-results" id="analiz" aria-labelledby="analiz-baslik">
+      <div className="panel-head">
+        <h2 className="panel-title" id="analiz-baslik">Rasyon Analizi</h2>
+        <span className="chip">{theoryMeta.name}</span>
       </div>
 
-      <div className="metrics-grid">
-        <MetricBlock 
-          label={theoryMeta.energyLabel}
-          provided={totals.energy} 
-          required={requirements.energy} 
-          unit={theoryMeta.energyUnit} 
-        />
-        <MetricBlock 
-          label={theoryMeta.proteinLabel}
-          provided={totals.protein} 
-          required={requirements.protein} 
-          unit={theoryMeta.proteinUnit}
-          decimals={selectedTheory === 'nrc' ? 2 : 0}
-        />
-        <MetricBlock 
-          label="Kuru Madde (KM)" 
-          provided={totals.dm} 
-          required={requirements.targetDM} 
-          unit="kg" 
-        />
-        <MetricBlock 
-          label="Lif / Selüloz" 
-          provided={totals.fiber} 
-          required={requirements.minFiber} 
-          unit="kg" 
-        />
-        <MetricBlock 
-          label="Karbonhidrat/Nişasta" 
-          provided={totals.cb} 
-          required={totals.dm * 0.45}
-          unit="kg" 
-          isMax={true}
-        />
-      </div>
-
-      {/* INRA: PDIE/PDIN breakdown */}
-      {selectedTheory === 'inra' && totals.pdie !== undefined && (
-        <div className="alert alert-info" style={{ marginBottom: '1.5rem' }}>
-          <strong>PDI Detay:</strong> PDIE (enerji bazlı) = {totals.pdie.toFixed(0)}g | PDIN (azot bazlı) = {totals.pdin.toFixed(0)}g
-          → Sınırlayıcı: <strong>{totals.pdie <= totals.pdin ? 'PDIE (enerji yetersiz)' : 'PDIN (azot yetersiz)'}</strong>
+      <div className="estimate">
+        <div className="estimate-label">
+          {isLactating ? 'Rasyonun desteklediği süt verimi' : 'Tahmini günlük canlı ağırlık artışı'}
         </div>
-      )}
-
-      {/* CNCPS-specific metrics */}
-      {selectedTheory === 'cncps' && totals.syncScore !== undefined && (
-        <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
-          <div className={`metric-card ${totals.syncScore >= 70 ? 'success' : totals.syncScore >= 40 ? 'warning' : 'danger'}`}>
-            <div className="metric-label">Senkronizasyon Skoru</div>
-            <div className="metric-value" style={{ fontSize: '1.5rem' }}>
-              %{totals.syncScore.toFixed(0)}
-            </div>
-            <div className="metric-sub" style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.3rem' }}>
-              Enerji-Protein Eşzamanlılığı
-            </div>
+        {hasRation && hasAnimal ? (
+          <div className="estimate-value">
+            {isLactating ? estimatedProduction.milk.toFixed(1) : estimatedProduction.gcaa.toFixed(2)}
+            <span className="estimate-unit">{isLactating ? 'L/gün' : 'kg/gün'}</span>
           </div>
-          <div className="metric-card info">
-            <div className="metric-label">Ort. Sindirim Hızı (kd)</div>
-            <div className="metric-value" style={{ fontSize: '1.5rem' }}>
-              %{(totals.avgKd || 0).toFixed(1)} <span className="metric-unit">/saat</span>
-            </div>
-          </div>
-          <div className="metric-card info">
-            <div className="metric-label">Ort. NDF Sindirebilirlik</div>
-            <div className="metric-value" style={{ fontSize: '1.5rem' }}>
-              %{(totals.avgNdfd || 0).toFixed(1)}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="metrics-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-        <div className="metric-card info">
-          <div className="metric-label">Enerji Kaynak Dağılımı</div>
-          <div className="metric-value" style={{ fontSize: '1.25rem' }}>
-            Karbonhidrat: %{totals.energyPercentCarbs.toFixed(1)}
-          </div>
-          <div className="metric-sub" style={{ fontSize: '1rem', color: 'var(--text-secondary)' }}>
-            Protein: %{totals.energyPercentProtein.toFixed(1)}
-          </div>
-        </div>
-        
-        <div className={`metric-card ${totals.recommendedSoda > 0 ? 'warning' : 'success'}`}>
-          <div className="metric-label">Asidoz Riski & Sodyum Bikarbonat (Soda)</div>
-          <div className="metric-value" style={{ fontSize: '1.25rem' }}>
-            {totals.recommendedSoda > 0 ? `${totals.recommendedSoda.toFixed(0)} gr / Gün` : 'Gerekmiyor'}
-          </div>
-          <div className="metric-sub">
-            Kesif Yem Oranı: %{totals.kesifRatio.toFixed(1)}
-          </div>
-        </div>
-      </div>
-
-      <div className="alert alert-info">
-        {animalType === 'besi' || animalType === 'bos_duve' || animalType === 'kuru_gebe' ? (
-          <>
-            <div>
-              <strong>Tahmini GCAA ({theoryMeta.name}):</strong> Mevcut rasyon ile hayvanın günlük tahmini canlı ağırlık artışı <strong>{estimatedProduction.gcaa.toFixed(2)} kg</strong> olarak hesaplanmıştır.
-            </div>
-            {animalType !== 'kuru_gebe' && (
-              <div style={{fontSize: '0.85rem', opacity: 0.8, marginTop: '0.4rem'}}>(Hedef: {targetGcaa} kg)</div>
-            )}
-          </>
         ) : (
-          <div>
-            <strong>Tahmini Süt Verimi ({theoryMeta.name}):</strong> Mevcut rasyonun enerji ve protein değerleri ile günlük <strong>{estimatedProduction.milk.toFixed(1)} Litre</strong> süt üretimi desteklenebilir.
+          <div className="estimate-empty">
+            {hasAnimal ? 'Tahmin için rasyona yem ekleyin.' : 'Tahmin için canlı ağırlık girin.'}
           </div>
+        )}
+        {showTarget && hasRation && hasAnimal && (
+          <div className="estimate-sub">Hedef: {targetGcaa || 0} kg/gün</div>
         )}
       </div>
 
-      {totals.energy < requirements.energy * 0.9 && (
-        <div className="alert alert-warning">
-          <strong>Enerji Yetersiz:</strong> Rasyonunuzdaki {theoryMeta.energyLabel.toLowerCase()} hedef gereksinimler için yetersiz kalıyor.
+      <div className="metric-grid">
+        <Metric label={theoryMeta.energyLabel} provided={totals.energy} required={requirements.energy} unit={theoryMeta.energyUnit} />
+        <Metric
+          label={theoryMeta.proteinLabel}
+          provided={totals.protein}
+          required={requirements.protein}
+          unit={theoryMeta.proteinUnit}
+          decimals={selectedTheory === 'nrc' ? 2 : 0}
+        />
+        <Metric label="Kuru Madde (KM)" provided={totals.dm} required={requirements.targetDM} unit="kg" mode="range" />
+        <Metric label="Lif / Selüloz" provided={totals.fiber} required={requirements.minFiber} unit="kg" />
+        <Metric label="Karbonhidrat (üst sınır)" provided={totals.cb} required={totals.dm * 0.45} unit="kg" mode="max" />
+      </div>
+
+      <dl className="fact-list">
+        <div>
+          <dt>Kesif yem oranı (KM)</dt>
+          <dd>%{totals.kesifRatio.toFixed(1)}</dd>
         </div>
-      )}
-      
-      {totals.protein < requirements.protein * 0.9 && (
-        <div className="alert alert-warning">
-          <strong>Protein Yetersiz:</strong> Rasyonunuzdaki {theoryMeta.proteinLabel.toLowerCase()} miktarı hedef gereksinimler için yeterli değil. Soya veya pamuk tohumu küspesi eklemeyi düşünebilirsiniz.
+        <div>
+          <dt>Soda (sodyum bikarbonat)</dt>
+          <dd className={totals.recommendedSoda > 0 ? 'text-warning' : ''}>
+            {totals.recommendedSoda > 0 ? `${totals.recommendedSoda.toFixed(0)} g/gün önerilir` : 'Gerekmiyor'}
+          </dd>
+        </div>
+        <div>
+          <dt>Enerji kaynağı</dt>
+          <dd>Karbonhidrat %{totals.energyPercentCarbs.toFixed(0)} · Protein %{totals.energyPercentProtein.toFixed(0)}</dd>
+        </div>
+        {selectedTheory === 'inra' && totals.pdie !== undefined && (
+          <div>
+            <dt>PDIE / PDIN</dt>
+            <dd>
+              {totals.pdie.toFixed(0)} g / {totals.pdin.toFixed(0)} g
+              {hasRation && <> · sınırlayıcı: {totals.pdie <= totals.pdin ? 'PDIE (enerji)' : 'PDIN (azot)'}</>}
+            </dd>
+          </div>
+        )}
+        {selectedTheory === 'cncps' && totals.syncScore !== undefined && (
+          <>
+            <div>
+              <dt>Senkronizasyon skoru</dt>
+              <dd className={hasRation && totals.syncScore < 40 ? 'text-danger' : hasRation && totals.syncScore < 70 ? 'text-warning' : ''}>
+                {hasRation ? `%${totals.syncScore.toFixed(0)}` : '—'}
+              </dd>
+            </div>
+            <div>
+              <dt>Ort. sindirim hızı (kd)</dt>
+              <dd>%{(totals.avgKd || 0).toFixed(1)} / saat</dd>
+            </div>
+            <div>
+              <dt>Ort. NDF sindirilebilirliği</dt>
+              <dd>%{(totals.avgNdfd || 0).toFixed(1)}</dd>
+            </div>
+          </>
+        )}
+      </dl>
+
+      {hasRation && hasAnimal && (
+        <div className="alerts">
+          {totals.energy < requirements.energy * 0.9 && (
+            <div className="alert alert-warning">
+              <strong>Enerji yetersiz.</strong> {theoryMeta.energyLabel} hedef gereksinimin altında kalıyor.
+            </div>
+          )}
+          {totals.protein < requirements.protein * 0.9 && (
+            <div className="alert alert-warning">
+              <strong>Protein yetersiz.</strong> {theoryMeta.proteinLabel} hedefin altında. Soya veya pamuk tohumu küspesi eklemeyi düşünebilirsiniz.
+            </div>
+          )}
+          {totals.fiber < requirements.minFiber && (
+            <div className="alert alert-danger">
+              <strong>Kaba yem yetersiz.</strong> Rasyonda yeterli selüloz/lif yok. İşkembe sağlığı için saman, yonca veya silaj oranını artırın.
+            </div>
+          )}
+          {dmStatus.percent > 110 && (
+            <div className="alert alert-warning">
+              <strong>Kuru madde fazla.</strong> Rasyon, hayvanın tahmini tüketim kapasitesinin (%{dmStatus.percent.toFixed(0)}) üzerinde; hayvan bu miktarı yiyemeyebilir.
+            </div>
+          )}
+          {selectedTheory === 'cncps' && totals.syncScore < 40 && (
+            <div className="alert alert-warning">
+              <strong>Düşük senkronizasyon.</strong> Yemlerin sindirim hızları (kd) çok farklı; enerji ve protein işkembede eşzamanlı çözülemeyebilir.
+            </div>
+          )}
+          {balanced && (
+            <div className="alert alert-success">
+              <strong>Rasyon dengeli ({theoryMeta.name}).</strong> Yaşama, verim ve gebelik gereksinimleri karşılanıyor.
+            </div>
+          )}
         </div>
       )}
 
-      {totals.fiber < requirements.minFiber && (
-        <div className="alert alert-danger">
-          <strong>Kaba Yem Yetersiz:</strong> Rasyonda yeterli selüloz/lif bulunmuyor. İşkembe sağlığı için saman, yonca veya silaj oranını artırın.
-        </div>
-      )}
-
-      {selectedTheory === 'cncps' && totals.syncScore !== undefined && totals.syncScore < 40 && (
-        <div className="alert alert-warning">
-          <strong>Düşük Senkronizasyon:</strong> Rasyondaki yemlerin sindirim hızları (kd) çok farklı. Enerji ve protein işkembede eşzamanlı çözülemeyebilir, bu protein kayıplarına yol açabilir.
-        </div>
-      )}
-
-      {totals.energy >= requirements.energy && totals.protein >= requirements.protein && totals.fiber >= requirements.minFiber && (
-        <div className="alert alert-success">
-          <strong>Rasyon Dengeli ({theoryMeta.name}):</strong> Tebrikler, rasyonunuz hayvanın tüm yaşama, verim ve gebelik gereksinimlerini dengeli bir şekilde karşılıyor.
-        </div>
-      )}
-    </div>
+      <p className="note">
+        {isLactating ? NOTES.sagmal : NOTES[animalType] || ''}
+        {isPregnant && <> {NOTES.gebe}</>}
+      </p>
+    </section>
   );
 };
 

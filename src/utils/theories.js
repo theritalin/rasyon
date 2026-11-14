@@ -6,7 +6,7 @@
  * 3. CNCPS – ME (Mcal, NDFD düzeltmeli) + Metabolik Protein (MP, g) (RDP/RUP)
  */
 
-import { convertToDM } from './calculations';
+import { convertToDM, toNum } from './calculations';
 
 // ─────────────────────────────────────────────
 //  T H E O R Y   M E T A
@@ -45,9 +45,49 @@ export const THEORY_META = {
 };
 
 // ─────────────────────────────────────────────
+//  Yem başına katkılar (rasyon toplamı ve satır gösterimi aynı formülü kullanır)
+// ─────────────────────────────────────────────
+
+// CNCPS enerji: ME + NDF sindirilebilirlik düzeltmesi
+// (ndfd 28 → -%3.4, ndfd 72 → +%5.4; referans ndfd = 45)
+export const cncpsFeedEnergy = (feed, dmKg) => {
+  const ndfd = feed.ndfd || 45;
+  return dmKg * feed.me * (1 + (ndfd - 45) * 0.002);
+};
+
+// CNCPS protein: kd bazlı RDP / RUP ayrımı → Metabolik Protein (g)
+//   A fraksiyonu (hemen çözünen) ~%20, B (yavaş sindirilen) ~%65, C (sindirilmez) ~%15
+//   RDP = A + B × kd/(kd+kp),  RUP = B × kp/(kd+kp)
+//   MP  = RDP × 0.85 (mikrobiyal yakalama) × 0.64 + RUP × 0.80
+export const cncpsFeedMp = (feed, dmKg) => {
+  const kd = feed.kd || 8;
+  const kp = feed.type === 'kesif' ? 5 : 3.5; // geçiş hızı %/saat
+  const cpGrams = dmKg * (feed.cp / 100) * 1000;
+  const rdp = cpGrams * (0.20 + 0.65 * (kd / (kd + kp)));
+  const rup = cpGrams * (0.65 * (kp / (kd + kp)));
+  return rdp * 0.85 * 0.64 + rup * 0.80;
+};
+
+// Tek bir yemin seçili teoriye göre enerji / protein katkısı
+export const getFeedContribution = (theory, feed, dmKg) => {
+  switch (theory) {
+    case 'inra':
+      return {
+        energy: dmKg * (feed.ufb || 0),
+        pdie: dmKg * (feed.pdie || 0),
+        pdin: dmKg * (feed.pdin || 0),
+      };
+    case 'cncps':
+      return { energy: cncpsFeedEnergy(feed, dmKg), protein: cncpsFeedMp(feed, dmKg) };
+    default:
+      return { energy: dmKg * feed.me, protein: dmKg * (feed.cp / 100) };
+  }
+};
+
+// ─────────────────────────────────────────────
 //  Shared helper: acidosis risk & energy breakdown
 // ─────────────────────────────────────────────
-const calcSharedMetrics = (totalDM, totalKesifDM, totalCB, totalEnergyFromProtein, totalEnergyFromCarbs) => {
+const calcSharedMetrics = (totalDM, totalKesifDM, totalEnergyFromProtein, totalEnergyFromCarbs) => {
   let recommendedSoda = 0;
   const kesifRatio = totalDM > 0 ? (totalKesifDM / totalDM) * 100 : 0;
   if (kesifRatio > 55 && totalKesifDM > 0) {
@@ -115,18 +155,17 @@ export const nrcRequirements = ({ weight, targetGcaa, animalType, milkYield, mil
 
 export const nrcRationTotals = (rationItems, feedsDb) => {
   let totalAsFed = 0, totalDM = 0, totalEnergy = 0, totalProtein = 0;
-  let totalFiber = 0, totalCB = 0, totalKesifDM = 0, totalKabaDM = 0;
+  let totalFiber = 0, totalCB = 0, totalKesifDM = 0;
   let totalEnergyFromCarbs = 0, totalEnergyFromProtein = 0;
 
   rationItems.forEach(item => {
     const feed = feedsDb.find(f => f.id === item.feedId);
     if (!feed) return;
-    const kg = Number(item.amount) || 0;
+    const kg = toNum(item.amount);
     totalAsFed += kg;
     const dmKg = convertToDM(kg, feed.dm);
     totalDM += dmKg;
     if (feed.type === 'kesif') totalKesifDM += dmKg;
-    if (feed.type === 'kaba') totalKabaDM += dmKg;
     totalEnergy += dmKg * feed.me;
     const feedCP = dmKg * (feed.cp / 100);
     totalProtein += feedCP;
@@ -136,7 +175,7 @@ export const nrcRationTotals = (rationItems, feedsDb) => {
     totalCB += dmKg * (feed.cb / 100);
   });
 
-  const shared = calcSharedMetrics(totalDM, totalKesifDM, totalCB, totalEnergyFromProtein, totalEnergyFromCarbs);
+  const shared = calcSharedMetrics(totalDM, totalKesifDM, totalEnergyFromProtein, totalEnergyFromCarbs);
 
   return {
     asFed: totalAsFed, dm: totalDM, energy: totalEnergy, protein: totalProtein,
@@ -148,7 +187,6 @@ export const nrcEstimateProduction = ({ weight, energy, protein, animalType, mil
   if (!weight || weight <= 0) return { gcaa: 0, milk: 0 };
   
   const isBesi = animalType === 'besi' || animalType === 'bos_duve';
-  const isLactating = animalType === 'sagmal' || animalType === 'gebe_sagmal';
   const isPregnant = animalType === 'gebe_sagmal' || animalType === 'kuru_gebe';
 
   let mEm = weight * 0.035;
@@ -239,18 +277,17 @@ export const inraRequirements = ({ weight, targetGcaa, animalType, milkYield, mi
 export const inraRationTotals = (rationItems, feedsDb) => {
   let totalAsFed = 0, totalDM = 0, totalEnergy = 0;
   let totalPDIE = 0, totalPDIN = 0;
-  let totalFiber = 0, totalCB = 0, totalKesifDM = 0, totalKabaDM = 0;
+  let totalFiber = 0, totalCB = 0, totalKesifDM = 0;
   let totalEnergyFromCarbs = 0, totalEnergyFromProtein = 0;
 
   rationItems.forEach(item => {
     const feed = feedsDb.find(f => f.id === item.feedId);
     if (!feed) return;
-    const kg = Number(item.amount) || 0;
+    const kg = toNum(item.amount);
     totalAsFed += kg;
     const dmKg = convertToDM(kg, feed.dm);
     totalDM += dmKg;
     if (feed.type === 'kesif') totalKesifDM += dmKg;
-    if (feed.type === 'kaba') totalKabaDM += dmKg;
 
     // Enerji: UFB × KM
     totalEnergy += dmKg * (feed.ufb || 0);
@@ -271,7 +308,7 @@ export const inraRationTotals = (rationItems, feedsDb) => {
   // PDI = min(PDIE, PDIN) — RASYON düzeyinde, yem başına DEĞİL
   const totalProtein = Math.min(totalPDIE, totalPDIN);
 
-  const shared = calcSharedMetrics(totalDM, totalKesifDM, totalCB, totalEnergyFromProtein, totalEnergyFromCarbs);
+  const shared = calcSharedMetrics(totalDM, totalKesifDM, totalEnergyFromProtein, totalEnergyFromCarbs);
 
   return {
     asFed: totalAsFed, dm: totalDM, energy: totalEnergy, protein: totalProtein,
@@ -374,7 +411,7 @@ export const cncpsRequirements = ({ weight, targetGcaa, animalType, milkYield, m
 
 export const cncpsRationTotals = (rationItems, feedsDb) => {
   let totalAsFed = 0, totalDM = 0, totalEnergy = 0, totalProtein = 0;
-  let totalFiber = 0, totalCB = 0, totalKesifDM = 0, totalKabaDM = 0;
+  let totalFiber = 0, totalCB = 0, totalKesifDM = 0;
   let totalEnergyFromCarbs = 0, totalEnergyFromProtein = 0;
   let totalKdWeighted = 0, totalNdfdWeighted = 0;
   let syncNumerator = 0, syncDenominator = 0;
@@ -382,51 +419,17 @@ export const cncpsRationTotals = (rationItems, feedsDb) => {
   rationItems.forEach(item => {
     const feed = feedsDb.find(f => f.id === item.feedId);
     if (!feed) return;
-    const kg = Number(item.amount) || 0;
+    const kg = toNum(item.amount);
     totalAsFed += kg;
     const dmKg = convertToDM(kg, feed.dm);
     totalDM += dmKg;
     if (feed.type === 'kesif') totalKesifDM += dmKg;
-    if (feed.type === 'kaba') totalKabaDM += dmKg;
 
-    // ── Enerji: ME + NDFD düzeltmesi ──
-    // NDF sindirebilirliği yüksek yemler biraz daha fazla enerji sağlar.
-    // Düzeltme miktarı: ±5% civarı (ndfd 28→ -%3.4, ndfd 72→ +%5.4)
-    const ndfd = feed.ndfd || 45;
-    const ndfdBaseline = 45;
-    const ndfdCorrection = 1 + (ndfd - ndfdBaseline) * 0.002;
-    const adjustedME = dmKg * feed.me * ndfdCorrection;
-    totalEnergy += adjustedME;
-
-    // ── Protein: kd bazlı RDP / RUP ayrımı → MP ──
     const kd = feed.kd || 8;
-    // Passage rate: kesif ~5%/hr, kaba ~3.5%/hr
-    const kp = feed.type === 'kesif' ? 5 : 3.5;
-
+    const ndfd = feed.ndfd || 45;
+    totalEnergy += cncpsFeedEnergy(feed, dmKg);
+    totalProtein += cncpsFeedMp(feed, dmKg);
     const cpGrams = dmKg * (feed.cp / 100) * 1000;
-
-    // Protein fraksiyonları (basitleştirilmiş):
-    //   A fraksiyonu (hemen çözünen): ~20%
-    //   B fraksiyonu (yavaş sindirimli): ~65%
-    //   C fraksiyonu (sindirilmez): ~15%
-    const fracA = 0.20;
-    const fracB = 0.65;
-    // fracC = 0.15 (hesaplamaya girmez, kayıp)
-
-    // RDP = A + B × kd/(kd+kp)
-    const rdpFraction = fracA + fracB * (kd / (kd + kp));
-    const rdp = cpGrams * rdpFraction;
-    // RUP = B × kp/(kd+kp) (C fraksiyonu sindirilmez)
-    const rupFraction = fracB * (kp / (kd + kp));
-    const rup = cpGrams * rupFraction;
-
-    // MCP (Mikrobik Crude Protein) = RDP × %85 yakalama
-    // MP from microbes = MCP × %64 (80% true protein × 80% sindirilebilirlik)
-    const mpFromMicrobes = rdp * 0.85 * 0.64;
-    // MP from bypass = RUP × %80 bağırsak sindirilebilirliği
-    const mpFromRup = rup * 0.80;
-    const mp = mpFromMicrobes + mpFromRup;
-    totalProtein += mp;
 
     // ── Ortak metrikler ──
     totalFiber += dmKg * (feed.fb / 100);
@@ -440,7 +443,7 @@ export const cncpsRationTotals = (rationItems, feedsDb) => {
     syncDenominator += dmKg;
   });
 
-  const shared = calcSharedMetrics(totalDM, totalKesifDM, totalCB, totalEnergyFromProtein, totalEnergyFromCarbs);
+  const shared = calcSharedMetrics(totalDM, totalKesifDM, totalEnergyFromProtein, totalEnergyFromCarbs);
 
   // Ağırlıklı ortalamalar
   const avgKd = totalDM > 0 ? totalKdWeighted / totalDM : 0;
@@ -454,7 +457,7 @@ export const cncpsRationTotals = (rationItems, feedsDb) => {
     rationItems.forEach(item => {
       const feed = feedsDb.find(f => f.id === item.feedId);
       if (!feed) return;
-      const dmKg = convertToDM(Number(item.amount) || 0, feed.dm);
+      const dmKg = convertToDM(item.amount, feed.dm);
       const diff = (feed.kd || 8) - avgKdVal;
       variance += dmKg * diff * diff;
     });

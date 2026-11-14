@@ -12,7 +12,8 @@ Uygulama yerel sunucuda (genellikle `http://localhost:5173`) ayağa kalkacaktır
 ## Özellikler
 - **Yerel Hafıza (Local Storage):** Uygulamadaki hayvan kilosu, hedef GCAA (Günlük Canlı Ağırlık Artışı), eklenen yem kaynakları ve güncel rasyon bilgileri tarayıcınızın yerel hafızasında saklanır. Sayfayı yenileseniz veya sekme kapansanız dahi verileriniz kaybolmaz. Rasyonu sıfırlamak için "Rasyonu Temizle" butonunu kullanabilirsiniz.
 - **Dinamik Hesaplama:** Canlı ağırlık ve yaşama payına göre anında enerji ve protein ihtiyacı hesaplanır.
-- **Kişiselleştirilebilir Yem Veritabanı:** 16 kaba ve kesif yem önceden yüklenmiştir, kendi laboratuvar/analiz değerlerinize göre oranları düzenleyebilirsiniz.
+- **Kişiselleştirilebilir Yem Veritabanı:** 17 kaba ve kesif yem önceden yüklenmiştir. Tüm değerleri (INRA ve CNCPS alanları dahil) kendi analizlerinize göre düzenleyebilir, yeni yem ekleyebilir veya varsayılan değerlere dönebilirsiniz.
+- **Mobil Uyumlu Arayüz:** Telefonda tek sütun, büyük dokunma hedefleri ve ekranın altında sabit duran enerji / protein / KM / maliyet özeti ile çalışır. Açık ve koyu tema cihaz ayarını izler.
 - **Çoklu Teori Desteği:** NRC, INRA ve CNCPS hesaplama teorilerinden istediğinizi seçerek rasyonunuzu değerlendirebilirsiniz.
 
 ---
