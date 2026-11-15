@@ -101,8 +101,12 @@ const ResultsDashboard = ({ requirements, totals, targetGcaa, estimatedProductio
           </dd>
         </div>
         <div>
-          <dt>Enerji kaynağı</dt>
-          <dd>Karbonhidrat %{totals.energyPercentCarbs.toFixed(0)} · Protein %{totals.energyPercentProtein.toFixed(0)}</dd>
+          <dt>Enerji yoğunluğu</dt>
+          <dd>{hasRation ? `${totals.energyDensity.toFixed(2)} ${theoryMeta.energyUnit} / kg KM` : '—'}</dd>
+        </div>
+        <div>
+          <dt>Ham protein (KM'de)</dt>
+          <dd>{hasRation ? `%${totals.cpPct.toFixed(1)}` : '—'}</dd>
         </div>
         {selectedTheory === 'inra' && totals.pdie !== undefined && (
           <div>

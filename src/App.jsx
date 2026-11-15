@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { initialFeeds } from './data/feeds';
 import { toNum } from './utils/calculations';
-import { getTheoryFunctions, THEORY_META } from './utils/theories';
+import { getTheoryFunctions, rumenLimits, THEORY_META } from './utils/theories';
 import InputSection from './components/InputSection';
 import FeedDatabase from './components/FeedDatabase';
 import RationBuilder from './components/RationBuilder';
@@ -48,9 +48,13 @@ const loadFeeds = () => {
     .filter(sf => sf && sf.id !== undefined)
     .map(sf => {
       const initial = initialFeeds.find(f => f.id === sf.id);
-      return initial
-        ? { ...initial, ...sf }
-        : { ufl: 0.8, ufb: 0.8, pdie: 80, pdin: 80, kd: 10, ndfd: 40, cb: 0, ...sf };
+      if (initial) {
+        // Eski kayıtlardaki "ufb" alanı artık "ufv"; varsayılan yemlerde güncel UFV değeri kullanılır
+        const { ufb: _oldUfb, ...rest } = sf;
+        return { ...initial, ...rest, ufv: sf.ufv ?? initial.ufv };
+      }
+      const { ufb, ...rest } = sf;
+      return { ufl: 0.8, pdie: 80, pdin: 80, kd: 10, ndfd: 40, cb: 0, ...rest, ufv: sf.ufv ?? ufb ?? 0.8 };
     });
   initialFeeds.forEach(initial => {
     if (!merged.some(f => f.id === initial.id)) merged.push(initial);
@@ -76,6 +80,11 @@ function App() {
   });
   const [feedsDb, setFeedsDb] = useState(loadFeeds);
   const [rationItems, setRationItems] = useState(loadRation);
+  // Hayvan tipine göre kullanıcının değiştirdiği işkembe sınırları: { besi: { minFiberPct: '12' }, ... }
+  const [limitOverrides, setLimitOverrides] = useState(() => {
+    const saved = loadJson('rasyon_limits', {});
+    return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+  });
 
   usePersisted('rasyon_weight', weight);
   usePersisted('rasyon_targetGcaa', targetGcaa);
@@ -86,6 +95,26 @@ function App() {
   usePersisted('rasyon_theory', selectedTheory);
   usePersisted('rasyon_feedsDb', feedsDb, JSON.stringify);
   usePersisted('rasyon_rationItems', rationItems, JSON.stringify);
+  usePersisted('rasyon_limits', limitOverrides, JSON.stringify);
+
+  const defaultLimits = rumenLimits(animalType);
+  const limitOverride = limitOverrides[animalType] || {};
+  const limits = {
+    minFiberPct: limitOverride.minFiberPct ?? String(defaultLimits.minFiberPct),
+    maxNfcPct: limitOverride.maxNfcPct ?? String(defaultLimits.maxNfcPct),
+  };
+
+  const handleLimitChange = (key, value) => {
+    setLimitOverrides(prev => ({ ...prev, [animalType]: { ...prev[animalType], [key]: value } }));
+  };
+
+  const handleLimitReset = () => {
+    setLimitOverrides(prev => {
+      const next = { ...prev };
+      delete next[animalType];
+      return next;
+    });
+  };
 
   const handleClearRation = () => {
     if (window.confirm('Mevcut rasyonu tamamen silmek istediğinize emin misiniz?')) {
@@ -140,10 +169,10 @@ function App() {
   };
 
   // Get theory-specific functions
-  const theoryFns = useMemo(() => getTheoryFunctions(selectedTheory), [selectedTheory]);
+  const theoryFns = useMemo(() => getTheoryFunctions(selectedTheory, animalType), [selectedTheory, animalType]);
 
   // Derived state
-  const requirements = useMemo(
+  const baseRequirements = useMemo(
     () => theoryFns.calculateRequirements({
       weight: toNum(weight),
       targetGcaa: toNum(targetGcaa),
@@ -155,9 +184,16 @@ function App() {
     [weight, targetGcaa, animalType, milkYield, milkFat, pregnancyPeriod, theoryFns]
   );
   
+  // Kullanıcının girdiği işkembe sınırları teorinin varsayılanlarının yerine geçer
+  const requirements = useMemo(() => ({
+    ...baseRequirements,
+    minFiberPct: toNum(limits.minFiberPct, defaultLimits.minFiberPct),
+    maxNfcPct: toNum(limits.maxNfcPct, defaultLimits.maxNfcPct),
+  }), [baseRequirements, limits.minFiberPct, limits.maxNfcPct, defaultLimits.minFiberPct, defaultLimits.maxNfcPct]);
+
   const rationTotals = useMemo(
-    () => theoryFns.calculateRationTotals(rationItems, feedsDb),
-    [rationItems, feedsDb, theoryFns]
+    () => theoryFns.calculateRationTotals(rationItems, feedsDb, animalType),
+    [rationItems, feedsDb, theoryFns, animalType]
   );
   
   const estimatedProduction = useMemo(
@@ -204,6 +240,11 @@ function App() {
             setPregnancyPeriod={setPregnancyPeriod}
             selectedTheory={selectedTheory}
             setSelectedTheory={setSelectedTheory}
+            limits={limits}
+            defaultLimits={defaultLimits}
+            limitsCustomized={limitOverrides[animalType] !== undefined}
+            onLimitChange={handleLimitChange}
+            onLimitReset={handleLimitReset}
           />
           <ResultsDashboard
             requirements={requirements}
@@ -229,6 +270,7 @@ function App() {
             totalCost={totalCost}
             theoryMeta={theoryFns.meta}
             selectedTheory={selectedTheory}
+            animalType={animalType}
           />
           <FeedDatabase
             feedsDb={feedsDb}

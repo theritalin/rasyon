@@ -1,29 +1,33 @@
 import { useEffect, useRef, useState } from 'react';
 import { toNum } from '../utils/calculations';
+import { feedNfc } from '../utils/theories';
 import NumberField from './NumberField';
 
 const NEW_FEED = {
   name: '', type: 'kesif', dm: '88', cp: '', me: '', fb: '', cb: '', nfc: '', price: '',
-  ufl: '0.8', ufb: '0.8', pdie: '80', pdin: '80', kd: '8', ndfd: '45',
+  ufl: '0.8', ufv: '0.8', pdie: '80', pdin: '80', kd: '8', ndfd: '45',
 };
 
 const BASIC_FIELDS = [
   { key: 'dm', label: 'Kuru Madde', unit: '%', max: 100 },
   { key: 'cp', label: 'Ham Protein', unit: '%', max: 100 },
   { key: 'me', label: 'ME', unit: 'Mcal/kg', max: 5 },
-  { key: 'fb', label: 'Lif (Selüloz)', unit: '%', max: 100 },
+  { key: 'fb', label: 'Ham Selüloz', unit: '%', max: 100 },
   { key: 'nfc', label: 'Nişasta + Şeker (NFC)', unit: '%', max: 100 },
   { key: 'cb', label: 'Toplam Karbonhidrat', unit: '%', max: 100 },
   { key: 'price', label: 'Fiyat', unit: '₺/kg' },
 ];
 
 const ADVANCED_FIELDS = [
-  { key: 'ufb', label: 'UFB (INRA)', unit: '/kg KM', max: 2 },
+  { key: 'ufl', label: 'UFL (INRA, süt)', unit: '/kg KM', max: 2 },
+  { key: 'ufv', label: 'UFV (INRA, besi)', unit: '/kg KM', max: 2 },
   { key: 'pdie', label: 'PDIE (INRA)', unit: 'g/kg', max: 500 },
   { key: 'pdin', label: 'PDIN (INRA)', unit: 'g/kg', max: 500 },
   { key: 'kd', label: 'kd (CNCPS)', unit: '%/saat', max: 50 },
   { key: 'ndfd', label: 'NDFD (CNCPS)', unit: '%', max: 100 },
 ];
+
+const hasNfc = (feed) => feed.nfc !== undefined && feed.nfc !== null && feed.nfc !== '';
 
 const NUMERIC_KEYS = [...BASIC_FIELDS, ...ADVANCED_FIELDS].map(f => f.key);
 
@@ -119,7 +123,13 @@ const FeedDatabase = ({ feedsDb, isCustomFeed, onUpdateFeed, onAddFeed, onDelete
                   <div><dt>KM %</dt><dd>{feed.dm}</dd></div>
                   <div><dt>HP %</dt><dd>{feed.cp}</dd></div>
                   <div><dt>ME</dt><dd>{feed.me}</dd></div>
-                  <div><dt>Lif %</dt><dd>{feed.fb}</dd></div>
+                  <div><dt>HS %</dt><dd>{feed.fb}</dd></div>
+                  <div>
+                    <dt>NFC %</dt>
+                    <dd title={hasNfc(feed) ? undefined : 'Girilmemiş; toplam karbonhidrattan tahmin edildi'}>
+                      {hasNfc(feed) ? feed.nfc : `~${Math.round(feedNfc(feed))}`}
+                    </dd>
+                  </div>
                 </dl>
                 <button type="button" className="btn btn-secondary btn-sm" onClick={() => openForm(feed)} aria-label={`${feed.name} yemini düzenle`}>Düzenle</button>
               </li>
@@ -150,7 +160,15 @@ const FeedDatabase = ({ feedsDb, isCustomFeed, onUpdateFeed, onAddFeed, onDelete
 
             <div className="field-grid field-grid-compact">
               {BASIC_FIELDS.map(f => (
-                <NumberField key={f.key} label={f.label} unit={f.unit} value={form[f.key]} onChange={val => setField(f.key, val)} />
+                <NumberField
+                  key={f.key}
+                  label={f.label}
+                  unit={f.unit}
+                  value={form[f.key]}
+                  onChange={val => setField(f.key, val)}
+                  placeholder={f.key === 'nfc' ? `~${Math.round(feedNfc({ ...form, nfc: undefined, cb: toNum(form.cb) }))}` : undefined}
+                  hint={f.key === 'nfc' && form.nfc === '' ? 'Boş bırakılırsa toplam karbonhidrattan tahmin edilir.' : undefined}
+                />
               ))}
             </div>
 

@@ -1,4 +1,4 @@
-import { THEORY_META, meMaintenance } from '../utils/theories';
+import { THEORY_META, meMaintenance, inraEnergyUnit } from '../utils/theories';
 import { toNum } from '../utils/calculations';
 import NumberField from './NumberField';
 
@@ -39,6 +39,7 @@ const InputSection = ({
   milkFat, setMilkFat,
   pregnancyPeriod, setPregnancyPeriod,
   selectedTheory, setSelectedTheory,
+  limits, defaultLimits, limitsCustomized, onLimitChange, onLimitReset,
 }) => {
   const theories = Object.values(THEORY_META).map(t => ({ id: t.id, label: t.name }));
   const w = toNum(weight);
@@ -47,7 +48,7 @@ const InputSection = ({
   const isPregnant = animalType === 'gebe_sagmal' || animalType === 'kuru_gebe';
 
   const maintenance = selectedTheory === 'inra'
-    ? `${(1.4 + 0.006 * w).toFixed(2)} UFB`
+    ? `${(1.4 + 0.006 * w).toFixed(2)} ${inraEnergyUnit(animalType)}`
     : `${meMaintenance(w, animalType).toFixed(2)} Mcal ME`;
 
   return (
@@ -103,6 +104,35 @@ const InputSection = ({
           <Segmented label="Gebelik dönemi" options={PREGNANCY_PERIODS} value={pregnancyPeriod} onChange={setPregnancyPeriod} />
         </div>
       )}
+
+      <details className="advanced" open={limitsCustomized || undefined}>
+        <summary>İşkembe sınırları{limitsCustomized ? ' (değiştirildi)' : ''}</summary>
+        <div className="field-grid">
+          <NumberField
+            label="En az ham selüloz (KM'de)"
+            unit="%"
+            value={limits.minFiberPct}
+            onChange={val => onLimitChange('minFiberPct', val)}
+            step={1}
+            max={60}
+          />
+          <NumberField
+            label="En fazla nişasta + şeker (KM'de)"
+            unit="%"
+            value={limits.maxNfcPct}
+            onChange={val => onLimitChange('maxNfcPct', val)}
+            step={1}
+            max={80}
+          />
+        </div>
+        <p className="field-hint">
+          Bu hayvan tipi için varsayılan: ham selüloz en az %{defaultLimits.minFiberPct}, nişasta + şeker en fazla %{defaultLimits.maxNfcPct}.
+          Kendi danışmanınızın veya yem firmanızın değerlerini girebilirsiniz.
+        </p>
+        {limitsCustomized && (
+          <button type="button" className="btn btn-link" onClick={onLimitReset}>Varsayılan sınırlara dön</button>
+        )}
+      </details>
     </section>
   );
 };

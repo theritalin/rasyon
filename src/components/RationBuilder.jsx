@@ -3,7 +3,7 @@ import { convertToDM, toNum } from '../utils/calculations';
 import { getFeedContribution } from '../utils/theories';
 import NumberField from './NumberField';
 
-const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onUpdateFeedPrice, onRemove, onClear, totals, totalCost, theoryMeta, selectedTheory }) => {
+const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onUpdateFeedPrice, onRemove, onClear, totals, totalCost, theoryMeta, selectedTheory, animalType }) => {
   const [selectedFeedId, setSelectedFeedId] = useState('');
   const [amount, setAmount] = useState('');
 
@@ -67,7 +67,7 @@ const RationBuilder = ({ feedsDb, rationItems, onAdd, onUpdateAmount, onUpdateFe
               const feed = feedsDb.find(f => f.id === item.feedId);
               if (!feed) return null;
               const km = convertToDM(item.amount, feed.dm);
-              const c = getFeedContribution(selectedTheory, feed, km);
+              const c = getFeedContribution(selectedTheory, feed, km, animalType);
               const cost = toNum(item.amount) * toNum(feed.price);
               const stats = [
                 { label: 'KM (kg)', value: km.toFixed(2) },
