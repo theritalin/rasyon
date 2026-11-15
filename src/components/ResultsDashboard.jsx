@@ -45,7 +45,8 @@ const ResultsDashboard = ({ requirements, totals, targetGcaa, estimatedProductio
   const balanced = hasRation && hasAnimal
     && totals.energy >= requirements.energy
     && totals.protein >= requirements.protein
-    && totals.fiber >= requirements.minFiber
+    && totals.fiberPct >= requirements.minFiberPct
+    && totals.nfcPct <= requirements.maxNfcPct
     && dmStatus.percent <= 110;
 
   return (
@@ -84,8 +85,8 @@ const ResultsDashboard = ({ requirements, totals, targetGcaa, estimatedProductio
           decimals={selectedTheory === 'nrc' ? 2 : 0}
         />
         <Metric label="Kuru Madde (KM)" provided={totals.dm} required={requirements.targetDM} unit="kg" mode="range" />
-        <Metric label="Lif / Selüloz" provided={totals.fiber} required={requirements.minFiber} unit="kg" />
-        <Metric label="Karbonhidrat (üst sınır)" provided={totals.cb} required={totals.dm * 0.45} unit="kg" mode="max" />
+        <Metric label="Ham Selüloz (en az)" provided={totals.fiberPct} required={requirements.minFiberPct} unit="% KM" decimals={1} />
+        <Metric label="Nişasta + Şeker (en fazla)" provided={totals.nfcPct} required={requirements.maxNfcPct} unit="% KM" mode="max" decimals={1} />
       </div>
 
       <dl className="fact-list">
@@ -144,9 +145,14 @@ const ResultsDashboard = ({ requirements, totals, targetGcaa, estimatedProductio
               <strong>Protein yetersiz.</strong> {theoryMeta.proteinLabel} hedefin altında. Soya veya pamuk tohumu küspesi eklemeyi düşünebilirsiniz.
             </div>
           )}
-          {totals.fiber < requirements.minFiber && (
+          {totals.fiberPct < requirements.minFiberPct && (
             <div className="alert alert-danger">
-              <strong>Kaba yem yetersiz.</strong> Rasyonda yeterli selüloz/lif yok. İşkembe sağlığı için saman, yonca veya silaj oranını artırın.
+              <strong>Kaba yem yetersiz.</strong> Ham selüloz KM'nin %{totals.fiberPct.toFixed(1)}'i; en az %{requirements.minFiberPct} olmalı. İşkembe sağlığı için saman, yonca veya silaj oranını artırın.
+            </div>
+          )}
+          {totals.nfcPct > requirements.maxNfcPct && (
+            <div className={`alert ${totals.nfcPct > requirements.maxNfcPct * 1.2 ? 'alert-danger' : 'alert-warning'}`}>
+              <strong>Asidoz riski.</strong> Nişasta + şeker KM'nin %{totals.nfcPct.toFixed(1)}'i; bu hayvan için üst sınır %{requirements.maxNfcPct}. Tahıl oranını azaltın veya kaba yemi artırın.
             </div>
           )}
           {dmStatus.percent > 110 && (

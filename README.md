@@ -38,15 +38,23 @@ Sağmal İnek     : Hedef KM (kg) = Canlı Ağırlık × 0.020 + Süt Verimi × 
 ```
 **Örnek:** 500 kg besi hayvanı → `500 × 0.025 = 12.5 kg KM / gün`
 
-### Lif / Selüloz İhtiyacı
-İşkembe fonksiyonlarının sağlıklı çalışması ve laktik asidoz riskinin önlenmesi için minimum lif gereksinimi:
+### Ham Selüloz ve Nişasta + Şeker Sınırları
+İşkembe sağlığı için lif ve hızlı fermente olan karbonhidrat miktarı, hayvanın ağırlığına göre değil **rasyon kuru maddesindeki oranına** göre değerlendirilir:
 ```
-Min Lif (kg) = Canlı Ağırlık × 0.006
+Ham Selüloz (% KM)     = Σ (Yem KM × HS%)  / Toplam KM × 100
+Nişasta + Şeker (% KM) = Σ (Yem KM × NFC%) / Toplam KM × 100
 ```
-**Örnek:** 500 kg hayvan → `500 × 0.006 = 3.0 kg saf lif`
 
-### Karbonhidrat ve Asidoz Riski
-Rasyondaki NFC (Non-Fiber Carbohydrates) oranı **Kuru Maddenin maksimum %45'i** olarak sınırlandırılır.
+| Hayvan | En az ham selüloz | En fazla nişasta + şeker (NFC) |
+|--------|-------------------|-------------------------------|
+| Erkek besi | %10 | %55 (soda ile) |
+| Boş düve / inek | %15 | %40 |
+| Sağmal / gebe sağmal | %17 | %40 |
+| Kuru gebe | %20 | %35 |
+
+NFC (lif dışı karbonhidrat) = 100 − NDF − HP − yağ − kül. Yem veritabanındaki NFC değerleri NRC 2001 tablolarından yuvarlanmıştır. NFC girilmemiş eski yemlerde değer toplam karbonhidrattan tahmin edilir (kesif yemde aynısı, kaba yemde yarısı).
+
+**Örnek:** 10 kg mısır silajı + 7 kg arpa + 2 kg buğday samanı + 1.5 kg soya küspesi (12.3 kg KM) → ham selüloz %15.0, NFC %45.0. Besi için ikisi de uygun.
 
 ### Sodyum Bikarbonat (Soda) İhtiyacı
 Kesif yem oranı toplam KM'nin **%55'ini** aşarsa asidoz riski vardır:

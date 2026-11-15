@@ -3,7 +3,7 @@ import { toNum } from '../utils/calculations';
 import NumberField from './NumberField';
 
 const NEW_FEED = {
-  name: '', type: 'kesif', dm: '88', cp: '', me: '', fb: '', cb: '', price: '',
+  name: '', type: 'kesif', dm: '88', cp: '', me: '', fb: '', cb: '', nfc: '', price: '',
   ufl: '0.8', ufb: '0.8', pdie: '80', pdin: '80', kd: '8', ndfd: '45',
 };
 
@@ -12,7 +12,8 @@ const BASIC_FIELDS = [
   { key: 'cp', label: 'Ham Protein', unit: '%', max: 100 },
   { key: 'me', label: 'ME', unit: 'Mcal/kg', max: 5 },
   { key: 'fb', label: 'Lif (Selüloz)', unit: '%', max: 100 },
-  { key: 'cb', label: 'Karbonhidrat', unit: '%', max: 100 },
+  { key: 'nfc', label: 'Nişasta + Şeker (NFC)', unit: '%', max: 100 },
+  { key: 'cb', label: 'Toplam Karbonhidrat', unit: '%', max: 100 },
   { key: 'price', label: 'Fiyat', unit: '₺/kg' },
 ];
 
@@ -69,6 +70,7 @@ const FeedDatabase = ({ feedsDb, isCustomFeed, onUpdateFeed, onAddFeed, onDelete
     const feed = { ...form, name: form.name.trim() };
     NUMERIC_KEYS.forEach(k => { feed[k] = toNum(form[k]); });
     if (form.price === '') feed.price = '';
+    if (form.nfc === '') delete feed.nfc; // boşsa toplam karbonhidrattan tahmin edilir
     if (form.id === undefined) onAddFeed(feed); else onUpdateFeed(feed);
     closeForm();
   };

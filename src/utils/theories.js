@@ -163,10 +163,31 @@ const targetDryMatter = (weight, animalType, milkYield) => {
   return weight * 0.025;
 };
 
+// İşkembe sağlığı sınırları (rasyon KM'sindeki oran, %)
+//   minFiberPct: en az ham selüloz   maxNfcPct: en fazla nişasta + şeker (NFC)
+//   Süt ineği: NRC 2001 (HS ≥ %17, NFC ≤ %40); kuru dönem daha kaba ağırlıklı.
+//   Besi: yoğun besi rasyonları HS %10'a kadar inebilir, NFC %55'e kadar çıkabilir (soda ile).
+const RUMEN_LIMITS = {
+  besi: { minFiberPct: 10, maxNfcPct: 55 },
+  bos_duve: { minFiberPct: 15, maxNfcPct: 40 },
+  sagmal: { minFiberPct: 17, maxNfcPct: 40 },
+  gebe_sagmal: { minFiberPct: 17, maxNfcPct: 40 },
+  kuru_gebe: { minFiberPct: 20, maxNfcPct: 35 },
+};
+export const rumenLimits = (animalType) => RUMEN_LIMITS[animalType] || RUMEN_LIMITS.besi;
+
+// NFC değeri girilmemiş (eski kayıtlı) yemler için tahmin:
+// kesif yemlerde toplam karbonhidrat ≈ NFC, kaba yemlerde yaklaşık yarısı lif dışıdır.
+export const feedNfc = (feed) => {
+  if (feed.nfc !== undefined && feed.nfc !== null && feed.nfc !== '') return Number(feed.nfc) || 0;
+  const cb = Number(feed.cb) || 0;
+  return feed.type === 'kaba' ? cb * 0.5 : cb;
+};
+
 // ─────────────────────────────────────────────
 //  Shared helper: acidosis risk & energy breakdown
 // ─────────────────────────────────────────────
-const calcSharedMetrics = (totalDM, totalKesifDM, totalEnergyFromProtein, totalEnergyFromCarbs) => {
+const calcSharedMetrics = (totalDM, totalKesifDM, totalEnergyFromProtein, totalEnergyFromCarbs, totalFiber, totalNFC) => {
   let recommendedSoda = 0;
   const kesifRatio = totalDM > 0 ? (totalKesifDM / totalDM) * 100 : 0;
   if (kesifRatio > 55 && totalKesifDM > 0) {
@@ -175,14 +196,16 @@ const calcSharedMetrics = (totalDM, totalKesifDM, totalEnergyFromProtein, totalE
   const totalCalcEnergy = totalEnergyFromProtein + totalEnergyFromCarbs;
   const energyPercentProtein = totalCalcEnergy > 0 ? (totalEnergyFromProtein / totalCalcEnergy) * 100 : 0;
   const energyPercentCarbs = totalCalcEnergy > 0 ? (totalEnergyFromCarbs / totalCalcEnergy) * 100 : 0;
-  return { kesifRatio, recommendedSoda, energyPercentProtein, energyPercentCarbs };
+  const fiberPct = totalDM > 0 ? (totalFiber / totalDM) * 100 : 0;
+  const nfcPct = totalDM > 0 ? (totalNFC / totalDM) * 100 : 0;
+  return { kesifRatio, recommendedSoda, energyPercentProtein, energyPercentCarbs, nfc: totalNFC, fiberPct, nfcPct };
 };
 
 // ═══════════════════════════════════════════════
 //  N R C   (mevcut / referans sistem)
 // ═══════════════════════════════════════════════
 export const nrcRequirements = ({ weight, targetGcaa, animalType, milkYield, milkFat, pregnancyPeriod }) => {
-  if (!weight || weight <= 0) return { energy: 0, protein: 0, minFiber: 0, cb: 0, targetDM: 0 };
+  if (!weight || weight <= 0) return { energy: 0, protein: 0, targetDM: 0, ...rumenLimits(animalType) };
 
   const isBesi = animalType === 'besi' || animalType === 'bos_duve';
   const isLactating = animalType === 'sagmal' || animalType === 'gebe_sagmal';
@@ -207,16 +230,14 @@ export const nrcRequirements = ({ weight, targetGcaa, animalType, milkYield, mil
     totalCp += pregnancyPeriod === 'son_3_ay' ? 0.250 : 0.050;
   }
 
-  const minFiber = weight * 0.006;
-  const cb = weight * 0.015 + (isBesi ? ((targetGcaa || 0) * 1.5) : (isLactating ? milkYield * 0.05 : 0));
   const targetDM = targetDryMatter(weight, animalType, milkYield);
 
-  return { energy: totalMe, protein: totalCp, minFiber, cb, targetDM };
+  return { energy: totalMe, protein: totalCp, targetDM, ...rumenLimits(animalType) };
 };
 
 export const nrcRationTotals = (rationItems, feedsDb) => {
   let totalAsFed = 0, totalDM = 0, totalEnergy = 0, totalProtein = 0;
-  let totalFiber = 0, totalCB = 0, totalKesifDM = 0;
+  let totalFiber = 0, totalCB = 0, totalNFC = 0, totalKesifDM = 0;
   let totalEnergyFromCarbs = 0, totalEnergyFromProtein = 0;
 
   rationItems.forEach(item => {
@@ -234,9 +255,10 @@ export const nrcRationTotals = (rationItems, feedsDb) => {
     totalEnergyFromCarbs += dmKg * (feed.cb / 100) * 4;
     totalFiber += dmKg * (feed.fb / 100);
     totalCB += dmKg * (feed.cb / 100);
+    totalNFC += dmKg * (feedNfc(feed) / 100);
   });
 
-  const shared = calcSharedMetrics(totalDM, totalKesifDM, totalEnergyFromProtein, totalEnergyFromCarbs);
+  const shared = calcSharedMetrics(totalDM, totalKesifDM, totalEnergyFromProtein, totalEnergyFromCarbs, totalFiber, totalNFC);
 
   return {
     asFed: totalAsFed, dm: totalDM, energy: totalEnergy, protein: totalProtein,
@@ -280,7 +302,7 @@ export const nrcEstimateProduction = ({ weight, energy, protein, animalType, mil
 //  PDI = min(toplam PDIE, toplam PDIN) — rasyon düzeyinde!
 // ═══════════════════════════════════════════════
 export const inraRequirements = ({ weight, targetGcaa, animalType, milkYield, milkFat, pregnancyPeriod }) => {
-  if (!weight || weight <= 0) return { energy: 0, protein: 0, minFiber: 0, cb: 0, targetDM: 0 };
+  if (!weight || weight <= 0) return { energy: 0, protein: 0, targetDM: 0, ...rumenLimits(animalType) };
 
   const isBesi = animalType === 'besi' || animalType === 'bos_duve';
   const isLactating = animalType === 'sagmal' || animalType === 'gebe_sagmal';
@@ -317,17 +339,15 @@ export const inraRequirements = ({ weight, targetGcaa, animalType, milkYield, mi
     }
   }
 
-  const minFiber = weight * 0.006;
-  const cb = weight * 0.015 + (isBesi ? ((targetGcaa || 0) * 1.5) : (isLactating ? milkYield * 0.05 : 0));
   const targetDM = targetDryMatter(weight, animalType, milkYield);
 
-  return { energy: totalUfb, protein: totalPdi, minFiber, cb, targetDM };
+  return { energy: totalUfb, protein: totalPdi, targetDM, ...rumenLimits(animalType) };
 };
 
 export const inraRationTotals = (rationItems, feedsDb) => {
   let totalAsFed = 0, totalDM = 0, totalEnergy = 0;
   let totalPDIE = 0, totalPDIN = 0;
-  let totalFiber = 0, totalCB = 0, totalKesifDM = 0;
+  let totalFiber = 0, totalCB = 0, totalNFC = 0, totalKesifDM = 0;
   let totalEnergyFromCarbs = 0, totalEnergyFromProtein = 0;
 
   rationItems.forEach(item => {
@@ -348,6 +368,7 @@ export const inraRationTotals = (rationItems, feedsDb) => {
 
     totalFiber += dmKg * (feed.fb / 100);
     totalCB += dmKg * (feed.cb / 100);
+    totalNFC += dmKg * (feedNfc(feed) / 100);
 
     // Enerji dağılımı tahmini
     const cpKg = dmKg * (feed.cp / 100);
@@ -358,7 +379,7 @@ export const inraRationTotals = (rationItems, feedsDb) => {
   // PDI = min(PDIE, PDIN) — RASYON düzeyinde, yem başına DEĞİL
   const totalProtein = Math.min(totalPDIE, totalPDIN);
 
-  const shared = calcSharedMetrics(totalDM, totalKesifDM, totalEnergyFromProtein, totalEnergyFromCarbs);
+  const shared = calcSharedMetrics(totalDM, totalKesifDM, totalEnergyFromProtein, totalEnergyFromCarbs, totalFiber, totalNFC);
 
   return {
     asFed: totalAsFed, dm: totalDM, energy: totalEnergy, protein: totalProtein,
@@ -414,7 +435,7 @@ export const inraEstimateProduction = ({ weight, energy, protein, animalType, mi
 //  Ekstra: Senkronizasyon skoru
 // ═══════════════════════════════════════════════
 export const cncpsRequirements = ({ weight, targetGcaa, animalType, milkYield, milkFat, pregnancyPeriod }) => {
-  if (!weight || weight <= 0) return { energy: 0, protein: 0, minFiber: 0, cb: 0, targetDM: 0 };
+  if (!weight || weight <= 0) return { energy: 0, protein: 0, targetDM: 0, ...rumenLimits(animalType) };
 
   const isBesi = animalType === 'besi' || animalType === 'bos_duve';
   const isLactating = animalType === 'sagmal' || animalType === 'gebe_sagmal';
@@ -446,17 +467,15 @@ export const cncpsRequirements = ({ weight, targetGcaa, animalType, milkYield, m
     }
   }
 
-  const minFiber = weight * 0.006;
-  const cb = weight * 0.015 + (isBesi ? ((targetGcaa || 0) * 1.5) : (isLactating ? milkYield * 0.05 : 0));
 
   const targetDM = targetDryMatter(weight, animalType, milkYield);
 
-  return { energy: totalMe, protein: totalMp, minFiber, cb, targetDM };
+  return { energy: totalMe, protein: totalMp, targetDM, ...rumenLimits(animalType) };
 };
 
 export const cncpsRationTotals = (rationItems, feedsDb) => {
   let totalAsFed = 0, totalDM = 0, totalEnergy = 0, totalProtein = 0;
-  let totalFiber = 0, totalCB = 0, totalKesifDM = 0;
+  let totalFiber = 0, totalCB = 0, totalNFC = 0, totalKesifDM = 0;
   let totalEnergyFromCarbs = 0, totalEnergyFromProtein = 0;
   let totalKdWeighted = 0, totalNdfdWeighted = 0;
   let syncNumerator = 0, syncDenominator = 0;
@@ -479,6 +498,7 @@ export const cncpsRationTotals = (rationItems, feedsDb) => {
     // ── Ortak metrikler ──
     totalFiber += dmKg * (feed.fb / 100);
     totalCB += dmKg * (feed.cb / 100);
+    totalNFC += dmKg * (feedNfc(feed) / 100);
     totalEnergyFromProtein += cpGrams * 0.004; // 1g protein ≈ 4 kcal → 0.004 Mcal
     totalEnergyFromCarbs += dmKg * (feed.cb / 100) * 4;
 
@@ -488,7 +508,7 @@ export const cncpsRationTotals = (rationItems, feedsDb) => {
     syncDenominator += dmKg;
   });
 
-  const shared = calcSharedMetrics(totalDM, totalKesifDM, totalEnergyFromProtein, totalEnergyFromCarbs);
+  const shared = calcSharedMetrics(totalDM, totalKesifDM, totalEnergyFromProtein, totalEnergyFromCarbs, totalFiber, totalNFC);
 
   // Ağırlıklı ortalamalar
   const avgKd = totalDM > 0 ? totalKdWeighted / totalDM : 0;
